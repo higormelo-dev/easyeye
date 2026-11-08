@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiProviderInterface, AiRunProviderCallStoreInterface};
-use App\Domains\AI\Exceptions\AiRunCancelledException;
+use App\Domains\AI\Exceptions\{AiProviderRequestException, AiRunCancelledException};
 use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Support\ProviderDataPolicy;
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData, AiWorkflowResultData};
@@ -125,6 +125,7 @@ class AiOrchestrator
         }
 
         $lastException = null;
+        $skipped       = [];
 
         foreach ($chain as $index => $provider) {
             $providerEnum = $provider->provider();
@@ -133,6 +134,8 @@ class AiOrchestrator
 
             // Circuit breaker aberto → não tenta, vai para o próximo provider.
             if ($this->circuitBreaker->isOpen($providerEnum, $entityId)) {
+                $skipped[] = $providerEnum;
+
                 $this->callStore->store(
                     aiRunId: (string) $run->id,
                     role: $role,
@@ -177,11 +180,7 @@ class AiOrchestrator
             } catch (Throwable $e) {
                 $lastException = $e;
 
-                $this->circuitBreaker->recordFailure(
-                    provider: $providerEnum,
-                    triggerType: $this->classifyFailure($e),
-                    entityId: $entityId,
-                );
+                $this->recordProviderFailure($providerEnum, $e, $entityId);
 
                 $this->callStore->store(
                     aiRunId: (string) $run->id,
@@ -205,6 +204,14 @@ class AiOrchestrator
 
                 // Loop continua → próximo provider da chain.
             }
+        }
+
+        // Nenhuma chamada feita (todos com o circuito aberto): o erro diz o motivo
+        // (sem crédito, chave, limite) e até quando — quem chama decide esperar ou parar.
+        if ($lastException === null && $skipped !== []) {
+            $state = $this->circuitBreaker->openState($skipped[0], $entityId);
+
+            throw AiProviderRequestException::circuitOpen($skipped[0], $state['trigger_type'] ?? null, $state['open_until'] ?? null);
         }
 
         // Esgotou a chain sem sucesso. Re-lança o último erro para o execution service
@@ -236,17 +243,56 @@ class AiOrchestrator
         return $this->providerManager->pinned($code);
     }
 
+    /**
+     * Sem crédito/cota ou chave recusada valem para a conta toda: abre o
+     * circuito global na hora e avisa o time (repetir só atrasa a falha).
+     * Limite por minuto com espera informada: suspende até lá, para as outras
+     * chamadas irem ao fallback em vez de bater no 429. O resto conta no limiar.
+     */
+    private function recordProviderFailure(AiProvider $provider, Throwable $e, string $entityId): void
+    {
+        $trigger = $this->classifyFailure($e);
+
+        if ($e instanceof AiProviderRequestException && $e->httpStatus > 0 && $e->needsHumanAction()) {
+            $this->circuitBreaker->trip($provider, $trigger, (int) config('ai.circuit_breaker.human_action_cooldown_seconds', 900));
+            AiOperationalAlerts::critical($e->category, $provider, ['http_status' => $e->httpStatus, 'error_code' => $e->errorCode]);
+
+            return;
+        }
+
+        if ($e instanceof AiProviderRequestException
+            && $e->category === AiProviderRequestException::CATEGORY_RATE_LIMIT
+            && $e->retryAfterSeconds !== null) {
+            $max = max(1, (int) config('ai.circuit_breaker.rate_limit_max_open_seconds', 120));
+            $this->circuitBreaker->trip($provider, $trigger, (int) min($max, max(1, ceil($e->retryAfterSeconds))));
+
+            return;
+        }
+
+        $this->circuitBreaker->recordFailure(provider: $provider, triggerType: $trigger, entityId: $entityId);
+    }
+
     private function classifyFailure(Throwable $e): string
     {
+        if ($e instanceof AiProviderRequestException) {
+            return match ($e->category) {
+                AiProviderRequestException::CATEGORY_OVERLOADED => 'server_error',
+                AiProviderRequestException::CATEGORY_TOO_LARGE,
+                AiProviderRequestException::CATEGORY_REQUEST => 'request',
+                default                                      => $e->category, // rate_limit, quota, auth
+            };
+        }
+
         $message = strtolower($e->getMessage());
 
         return match (true) {
-            str_contains($message, 'timeout')                                       => 'timeout',
-            str_contains($message, 'connect')                                       => 'connection',
-            str_contains($message, '401') || str_contains($message, 'unauthorized') => 'auth',
-            str_contains($message, '429') || str_contains($message, 'rate')         => 'rate_limit',
-            str_contains($message, '5')                                             => 'server_error',
-            default                                                                 => 'unknown',
+            str_contains($message, 'timeout') || str_contains($message, 'timed out')         => 'timeout',
+            str_contains($message, 'connect')                                                => 'connection',
+            str_contains($message, '401') || str_contains($message, 'unauthorized')          => 'auth',
+            (bool) preg_match('/\b429\b/', $message) || str_contains($message, 'rate limit') => 'rate_limit',
+            // Status 5xx no texto — não qualquer "5" (ex.: "gpt-5-mini").
+            (bool) preg_match('/\b5\d\d\b/', $message) => 'server_error',
+            default                                    => 'unknown',
         };
     }
 

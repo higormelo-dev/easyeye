@@ -21,8 +21,15 @@ class MedicinePosologyBatchGroup extends Model
     /** Posologia gravada nos itens (ainda sem posologia) do grupo. */
     public const STATUS_DONE = 'done';
 
-    /** IA falhou ou respondeu sem posologia utilizável. */
+    /** IA (ou o provedor) falhou, ou respondeu fora do formato. */
     public const STATUS_FAILED = 'failed';
+
+    /**
+     * IA respondeu, mas sem dose/frequência de propósito (depende da
+     * indicação, sem segurança — regra do prompt): fica sem posologia, com a
+     * nota da IA em `error`. Não é falha: não conta para interromper o lote.
+     */
+    public const STATUS_NO_SUGGESTION = 'no_suggestion';
 
     /** Todos os itens ganharam posologia antes da chamada (nenhuma chamada feita). */
     public const STATUS_SKIPPED = 'skipped';

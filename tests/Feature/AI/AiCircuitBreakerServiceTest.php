@@ -90,3 +90,32 @@ test('reset zera estado do breaker manualmente', function () {
     expect($breaker->failure_count)->toBe(0);
     expect($breaker->state)->toBe('closed');
 });
+
+test('trip abre o circuito GLOBAL na hora: vale para toda entity, mesmo a que tem a própria linha fechada', function () {
+    $service = new AiCircuitBreakerService(threshold: 5, cooldownSeconds: 120);
+    $entity  = Entity::factory()->create();
+
+    $service->recordFailure(AiProvider::OpenAI, 'timeout', (string) $entity->id); // linha da entity, fechada
+    $service->trip(AiProvider::OpenAI, 'quota', 900);
+
+    expect($service->isOpen(AiProvider::OpenAI, (string) $entity->id))->toBeTrue()
+        ->and($service->isOpen(AiProvider::OpenAI))->toBeTrue()
+        ->and($service->openState(AiProvider::OpenAI, (string) $entity->id)['trigger_type'])->toBe('quota')
+        ->and($service->isOpen(AiProvider::Gemini))->toBeFalse();
+
+    $this->travel(901)->seconds();
+
+    expect($service->isOpen(AiProvider::OpenAI, (string) $entity->id))->toBeFalse()
+        ->and($service->openState(AiProvider::OpenAI))->toBeNull();
+});
+
+test('trip nunca encurta um circuito já aberto por mais tempo (cota de 15 min e, no meio, um limite de 20 s)', function () {
+    $service = new AiCircuitBreakerService(threshold: 5, cooldownSeconds: 120);
+
+    $service->trip(AiProvider::OpenAI, 'quota', 900);
+    $service->trip(AiProvider::OpenAI, 'rate_limit', 20);
+
+    $this->travel(60)->seconds();
+
+    expect($service->openState(AiProvider::OpenAI)['trigger_type'] ?? null)->toBe('quota');
+});

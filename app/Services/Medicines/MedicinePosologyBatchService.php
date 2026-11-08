@@ -35,6 +35,22 @@ use Throwable;
  */
 class MedicinePosologyBatchService
 {
+    private const OUTCOME_DONE = 'done';
+
+    private const OUTCOME_SKIPPED = 'skipped';
+
+    private const OUTCOME_NO_SUGGESTION = 'no_suggestion';
+
+    private const OUTCOME_FAILED = 'failed';
+
+    /** Limite de uso do provedor: grupo pendente, continuação depois da espera. */
+    private const OUTCOME_RATE_LIMITED = 'rate_limited';
+
+    /** Sem crédito ou chave recusada: o lote para. */
+    private const OUTCOME_BLOCKED = 'blocked';
+
+    private const OUTCOME_CANCELLED = 'cancelled';
+
     /** Trava curta do "Iniciar" (dois cliques/abas não criam dois lotes). */
     private const START_LOCK = 'medicine-posology-batch:start';
 
@@ -262,9 +278,11 @@ class MedicinePosologyBatchService
     /**
      * Processa grupos pendentes por até $budgetSeconds (pelo menos um).
      *
-     * @return bool true = ainda há grupos (o job agenda a continuação)
+     * @return ?int null = nada mais a fazer (terminou, foi interrompido ou cancelado);
+     *              0 = ainda há grupos: o job agenda a continuação já;
+     *              n > 0 = o provedor pediu para esperar: continuação daqui a n segundos
      */
-    public function process(MedicinePosologyBatch $batch, int $budgetSeconds): bool
+    public function process(MedicinePosologyBatch $batch, int $budgetSeconds): ?int
     {
         $startedAt = microtime(true);
         $processed = 0;
@@ -276,6 +294,8 @@ class MedicinePosologyBatchService
                 'phase'      => MedicinePosologyBatch::PHASE_GENERATING,
                 'started_at' => $batch->started_at ?? now(),
             ]);
+        } elseif ($batch->status === ImportStatus::Processing && $batch->phase !== MedicinePosologyBatch::PHASE_GENERATING) {
+            $batch->update(['phase' => MedicinePosologyBatch::PHASE_GENERATING]); // voltou da espera do limite
         }
 
         // Auditoria: alterações nos itens em nome de quem disparou o lote.
@@ -287,7 +307,7 @@ class MedicinePosologyBatchService
                 $batch->refresh();
 
                 if ($batch->status !== ImportStatus::Processing) {
-                    return false; // cancelado (ou encerrado por outro worker)
+                    return null; // cancelado (ou encerrado por outro worker)
                 }
 
                 $group = $batch->groups()
@@ -298,32 +318,43 @@ class MedicinePosologyBatchService
                 if ($group === null) {
                     $this->finish($batch);
 
-                    return false;
+                    return null;
                 }
 
                 if ($processed > 0 && microtime(true) - $startedAt >= $budgetSeconds) {
-                    return true;
+                    return 0;
                 }
 
-                $called = $this->processGroup($batch, $group);
+                $result = $this->processGroup($batch, $group);
                 $processed++;
 
-                if ($this->tooManyConsecutiveFailures($batch)) {
-                    $batch->update([
-                        'status' => ImportStatus::Failed,
-                        'phase'  => null,
-                        'error'  => __('manager_medicines.batch_aborted_failures', [
-                            'count'    => (int) config('medicines.posology_batch.max_consecutive_failures', 5),
-                            'provider' => $batch->providerLabel(),
-                        ]),
-                        'finished_at' => now(),
-                    ]);
+                // Sem crédito ou chave recusada: nenhum grupo vai passar — para já, com o motivo (o time foi avisado).
+                if ($result['outcome'] === self::OUTCOME_BLOCKED) {
+                    $this->abort($batch, __('manager_medicines.batch_aborted_' . $result['reason'], ['provider' => $batch->providerLabel()]));
 
-                    return false;
+                    return null;
+                }
+
+                // Limite de uso: o grupo ficou pendente; continua depois da espera pedida.
+                if ($result['outcome'] === self::OUTCOME_RATE_LIMITED) {
+                    return $this->waitForProvider($batch, $result['retry_after']);
+                }
+
+                Cache::forget($this->providerWaitsKey($batch));
+
+                if ($this->tooManyConsecutiveFailures($batch)) {
+                    $badOutput = in_array($result['reason'], [MedicinePosologyAiException::EMPTY_OUTPUT, MedicinePosologyAiException::INVALID_OUTPUT], true);
+
+                    $this->abort($batch, __('manager_medicines.' . ($badOutput ? 'batch_aborted_bad_output' : 'batch_aborted_failures'), [
+                        'count'    => (int) config('medicines.posology_batch.max_consecutive_failures', 5),
+                        'provider' => $batch->providerLabel(),
+                    ]));
+
+                    return null;
                 }
 
                 // Throttle simples entre chamadas (limite de requisições do provedor).
-                if ($called && $delayMs > 0) {
+                if ($result['called'] && $delayMs > 0) {
                     Sleep::for($delayMs)->milliseconds();
                 }
             }
@@ -353,9 +384,9 @@ class MedicinePosologyBatchService
      * Um grupo: UMA chamada de IA (com novas tentativas em erro transitório)
      * aplicada a todos os itens do grupo ainda sem posologia.
      *
-     * @return bool se chamou a IA
+     * @return array{called: bool, outcome: string, reason: ?string, retry_after: ?float}
      */
-    private function processGroup(MedicinePosologyBatch $batch, MedicinePosologyBatchGroup $group): bool
+    private function processGroup(MedicinePosologyBatch $batch, MedicinePosologyBatchGroup $group): array
     {
         $ids     = array_values(array_map('strval', (array) $group->medicine_ids));
         $current = $this->filters->globalCatalog()->with('presentation:id,name')->whereIn('medicines.id', $ids)->get()->keyBy('id');
@@ -372,7 +403,7 @@ class MedicinePosologyBatchService
                 'skipped_count'    => $batch->skipped_count + count($ids),
             ]);
 
-            return false;
+            return $this->outcome(self::OUTCOME_SKIPPED, called: false);
         }
 
         $retries  = max(0, (int) config('medicines.posology_batch.retries', 2));
@@ -404,15 +435,33 @@ class MedicinePosologyBatchService
                     continue;
                 }
 
-                $this->failGroup($batch, $group, $attempts, $cost, $e->getMessage());
+                // Recusa deliberada (depende da indicação, sem segurança): o provedor
+                // respondeu — o grupo fica sem posologia, com a nota da IA, e o lote segue.
+                if ($e->reason === MedicinePosologyAiException::NO_SUGGESTION) {
+                    $this->closeGroup($batch, $group, MedicinePosologyBatchGroup::STATUS_NO_SUGGESTION, $attempts, $cost, $e->getMessage());
 
-                return true;
+                    return $this->outcome(self::OUTCOME_NO_SUGGESTION, reason: $e->reason);
+                }
+
+                // Limite de uso, sem crédito ou chave recusada: o grupo não teve culpa — continua pendente.
+                if (in_array($e->reason, [MedicinePosologyAiException::RATE_LIMITED, MedicinePosologyAiException::QUOTA, MedicinePosologyAiException::AUTH], true)) {
+                    $group->update(['attempts' => (int) $group->attempts + $attempts]);
+                    $batch->update(['ai_calls' => $batch->ai_calls + $attempts, 'cost_usd' => $batch->cost_usd + $cost]);
+
+                    return $e->reason === MedicinePosologyAiException::RATE_LIMITED
+                        ? $this->outcome(self::OUTCOME_RATE_LIMITED, reason: $e->reason, retryAfter: $e->retryAfterSeconds)
+                        : $this->outcome(self::OUTCOME_BLOCKED, reason: $e->reason);
+                }
+
+                $this->closeGroup($batch, $group, MedicinePosologyBatchGroup::STATUS_FAILED, $attempts, $cost, $e->getMessage());
+
+                return $this->outcome(self::OUTCOME_FAILED, reason: $e->reason);
             } catch (Throwable $e) {
                 // Inesperado (ex.: provedor removido no meio do lote): registra e segue.
                 Log::warning('Lote de posologia por IA: grupo falhou', ['batch_id' => $batch->id, 'group_id' => $group->id, 'error' => $e->getMessage()]);
-                $this->failGroup($batch, $group, $attempts, $cost, __('manager_medicines.ai_failed'));
+                $this->closeGroup($batch, $group, MedicinePosologyBatchGroup::STATUS_FAILED, $attempts, $cost, __('manager_medicines.ai_failed'));
 
-                return true;
+                return $this->outcome(self::OUTCOME_FAILED);
             }
         }
 
@@ -421,7 +470,7 @@ class MedicinePosologyBatchService
             $group->update(['attempts' => $attempts]);
             $batch->update(['ai_calls' => $batch->ai_calls + $attempts, 'cost_usd' => $batch->cost_usd + $cost]);
 
-            return true;
+            return $this->outcome(self::OUTCOME_CANCELLED);
         }
 
         [$updated, $skipped] = $this->apply($batch, $ids, $suggestion);
@@ -442,7 +491,13 @@ class MedicinePosologyBatchService
             'cost_usd'         => $batch->cost_usd + $cost,
         ]);
 
-        return true;
+        return $this->outcome(self::OUTCOME_DONE);
+    }
+
+    /** @return array{called: bool, outcome: string, reason: ?string, retry_after: ?float} */
+    private function outcome(string $outcome, bool $called = true, ?string $reason = null, ?float $retryAfter = null): array
+    {
+        return ['called' => $called, 'outcome' => $outcome, 'reason' => $reason, 'retry_after' => $retryAfter];
     }
 
     /**
@@ -484,24 +539,29 @@ class MedicinePosologyBatchService
         }));
     }
 
-    private function failGroup(MedicinePosologyBatch $batch, MedicinePosologyBatchGroup $group, int $attempts, float $cost, string $message): void
+    /** Grupo encerrado sem posologia: falha (conta no "Grupos com falha") ou recusa deliberada da IA (não conta). */
+    private function closeGroup(MedicinePosologyBatch $batch, MedicinePosologyBatchGroup $group, string $status, int $attempts, float $cost, string $message): void
     {
         $group->update([
-            'status'       => MedicinePosologyBatchGroup::STATUS_FAILED,
-            'attempts'     => $attempts,
+            'status'       => $status,
+            'attempts'     => (int) $group->attempts + $attempts,
             'error'        => mb_substr($message, 0, 1000),
             'processed_at' => now(),
         ]);
 
         $batch->update([
             'processed_groups' => $batch->processed_groups + 1,
-            'failed_groups'    => $batch->failed_groups + 1,
+            'failed_groups'    => $batch->failed_groups + ($status === MedicinePosologyBatchGroup::STATUS_FAILED ? 1 : 0),
             'ai_calls'         => $batch->ai_calls + $attempts,
             'cost_usd'         => $batch->cost_usd + $cost,
         ]);
     }
 
-    /** Falhas seguidas (sem nenhum sucesso no meio) = provedor fora: encerra o lote. */
+    /**
+     * Falhas seguidas (sem nenhuma resposta útil no meio) = provedor fora:
+     * encerra o lote. "Sem posologia sugerida" é resposta do provedor e
+     * quebra a sequência.
+     */
     private function tooManyConsecutiveFailures(MedicinePosologyBatch $batch): bool
     {
         $max = (int) config('medicines.posology_batch.max_consecutive_failures', 5);
@@ -511,12 +571,69 @@ class MedicinePosologyBatchService
         }
 
         $recent = $batch->groups()
-            ->whereIn('status', [MedicinePosologyBatchGroup::STATUS_DONE, MedicinePosologyBatchGroup::STATUS_FAILED])
+            ->whereIn('status', [MedicinePosologyBatchGroup::STATUS_DONE, MedicinePosologyBatchGroup::STATUS_FAILED, MedicinePosologyBatchGroup::STATUS_NO_SUGGESTION])
             ->orderByDesc('position')
             ->limit($max)
             ->pluck('status');
 
         return $recent->count() >= $max && $recent->every(fn (string $s) => $s === MedicinePosologyBatchGroup::STATUS_FAILED);
+    }
+
+    /**
+     * Provedor no limite de uso: o grupo ficou pendente e a continuação vai
+     * para daqui a pouco — a espera pedida (+1 s) ou, sem pedido, 5, 10, 20…
+     * s. Desiste, sem gastar mais, se o provedor pedir mais do que o lote
+     * aguarda (ex.: limite diário) ou depois de várias esperas seguidas sem
+     * nenhum grupo avançar.
+     *
+     * @return ?int segundos até a continuação; null = lote interrompido
+     */
+    private function waitForProvider(MedicinePosologyBatch $batch, ?float $retryAfter): ?int
+    {
+        $maxSeconds = max(1, (int) config('medicines.posology_batch.max_rate_limit_wait_seconds', 120));
+        $maxWaits   = max(1, (int) config('medicines.posology_batch.max_rate_limit_waits', 10));
+        $key        = $this->providerWaitsKey($batch);
+
+        // Cancelado enquanto a IA respondia: nada a agendar.
+        if ($batch->fresh()?->status !== ImportStatus::Processing) {
+            return null;
+        }
+
+        Cache::add($key, 0, now()->addHours(6));
+        $waits = (int) Cache::increment($key);
+        $wait  = $retryAfter !== null ? (int) ceil($retryAfter) : min($maxSeconds, 5 * 2 ** min(10, $waits - 1));
+
+        if ($waits > $maxWaits || $wait > $maxSeconds) {
+            Cache::forget($key);
+            $this->abort($batch, __('manager_medicines.batch_aborted_rate_limit', ['provider' => $batch->providerLabel()]));
+
+            return null;
+        }
+
+        $batch->update(['phase' => MedicinePosologyBatch::PHASE_RATE_LIMITED]);
+        $batch->touch(); // a tela mede "parado" pelo updated_at
+
+        return $wait + 1; // folga para o limite já ter liberado
+    }
+
+    private function providerWaitsKey(MedicinePosologyBatch $batch): string
+    {
+        return 'medicine-posology-batch:provider-waits:' . $batch->id;
+    }
+
+    private function abort(MedicinePosologyBatch $batch, string $message): void
+    {
+        // Cancelado pelo admin enquanto a IA respondia: o cancelamento vale (não vira "falhou").
+        if ($batch->refresh()->status !== ImportStatus::Processing) {
+            return;
+        }
+
+        $batch->update([
+            'status'      => ImportStatus::Failed,
+            'phase'       => null,
+            'error'       => $message,
+            'finished_at' => now(),
+        ]);
     }
 
     private function finish(MedicinePosologyBatch $batch): void

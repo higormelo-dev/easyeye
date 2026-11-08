@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Services\AiProviderSettings;
 use App\Domains\AI\Support\{PromptComposer, ProviderErrorSanitizer};
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
@@ -29,7 +30,7 @@ class OpenAiProvider implements AiProviderInterface
             ->withUserAgent($this->userAgent())
             ->connectTimeout($this->connectTimeoutSeconds())
             ->timeout($this->timeoutSeconds())
-            ->retry($this->retryTimes(), $this->retrySleepMilliseconds(), null, false)
+            ->retry($this->retryTimes(), $this->retrySleepMilliseconds(), AiProviderRequestException::shouldRetryHttp(...), false)
             ->post('/responses', $payload);
 
         if (! $response->successful()) {
@@ -283,6 +284,6 @@ class OpenAiProvider implements AiProviderInterface
 
         $safeMessage = ProviderErrorSanitizer::sanitize($rawMessage, 'Falha na integração OpenAI.');
 
-        return new RuntimeException("OpenAI request failed [{$status}/{$safeCode}]: {$safeMessage}");
+        return AiProviderRequestException::fromResponse(AiProvider::OpenAI, $response, "OpenAI request failed [{$status}/{$safeCode}]: {$safeMessage}");
     }
 }

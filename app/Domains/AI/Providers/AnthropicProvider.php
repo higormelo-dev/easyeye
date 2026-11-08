@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Services\AiProviderSettings;
 use App\Domains\AI\Support\{PromptComposer, ProviderErrorSanitizer};
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
@@ -32,7 +33,7 @@ class AnthropicProvider implements AiProviderInterface
             ->withUserAgent($this->userAgent())
             ->connectTimeout($this->connectTimeoutSeconds())
             ->timeout($this->timeoutSeconds())
-            ->retry($this->retryTimes(), $this->retrySleepMilliseconds(), null, false)
+            ->retry($this->retryTimes(), $this->retrySleepMilliseconds(), AiProviderRequestException::shouldRetryHttp(...), false)
             ->post('/v1/messages', $payload);
 
         if (! $response->successful()) {
@@ -291,6 +292,6 @@ class AnthropicProvider implements AiProviderInterface
         $safeType    = ProviderErrorSanitizer::sanitize($type, 'unknown');
         $safeMessage = ProviderErrorSanitizer::sanitize($rawMessage, 'Falha na integração Anthropic.');
 
-        return new RuntimeException("Anthropic request failed [{$status}/{$safeType}]: {$safeMessage}");
+        return AiProviderRequestException::fromResponse(AiProvider::Anthropic, $response, "Anthropic request failed [{$status}/{$safeType}]: {$safeMessage}");
     }
 }

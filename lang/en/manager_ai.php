@@ -326,4 +326,16 @@ return [
     'setup_required_url'             => 'This provider has no default address — also set the API address.',
     'setup_azure_note'               => 'In Azure AI Foundry, create the deployment as regional Standard in swedencentral (EU) and name it after the model (e.g. gpt-4o-mini). Global and Data Zone process outside the EU.',
     'setup_maritaca_note'            => 'Prefer the models with the "-br-sp" suffix: they process 100% in Brazil and need no transfer record.',
+
+    // Alert to the SaaS team (AiOperationalAlerts): provider stopped for a reason only a person can fix.
+    'alerts' => [
+        'subject'  => '[AI alert] :what',
+        'greeting' => 'Hello, :name!',
+        'action'   => 'Open AI providers',
+        'hint'     => 'Meanwhile, calls to this provider are suspended (features use another configured AI, when there is one). This alert repeats at most once an hour.',
+        'types'    => [
+            'quota' => ':provider refused the calls for lack of credit or quota on the account. Top up the account at the provider; calls resume by themselves within 15 minutes.',
+            'auth'  => ':provider refused the access key (invalid, revoked or without permission). Replace the key in the server .env and run php artisan config:cache.',
+        ],
+    ],
 ];

@@ -207,6 +207,18 @@ const tiles = computed(() => {
             label: props.t.batch_result_failed,
             value: number(b.failed_groups),
         },
+        // A IA respondeu sem posologia de propósito (depende da indicação): não é falha.
+        ...(b.no_suggestion_count > 0
+            ? [
+                  {
+                      key: 'no_suggestion',
+                      icon: 'ti ti-help-circle',
+                      tone: 'secondary',
+                      label: props.t.batch_result_no_suggestion,
+                      value: number(b.no_suggestion_count),
+                  },
+              ]
+            : []),
         {
             key: 'calls',
             icon: 'ti ti-sparkles',
@@ -399,6 +411,10 @@ const tiles = computed(() => {
                                         >{{ t.batch_result_failed }}:
                                         <strong>{{ number(b.failed_groups) }}</strong></span
                                     >
+                                    <span v-if="b.no_suggestion_count > 0" class="me-2"
+                                        >{{ t.batch_result_no_suggestion }}:
+                                        <strong>{{ number(b.no_suggestion_count) }}</strong></span
+                                    >
                                 </div>
                                 <div class="text-muted">
                                     {{ groupsText(b) }} · {{ t.batch_result_calls }}: {{ number(b.ai_calls) }} ·
@@ -411,6 +427,18 @@ const tiles = computed(() => {
                                 </div>
                                 <div v-if="b.remaining_groups > 0" class="text-muted">{{ remainingText(b) }}</div>
                                 <div v-if="b.error" class="text-danger">{{ b.error }}</div>
+                                <details v-if="b.no_suggestions?.length" class="mt-1">
+                                    <summary class="text-muted">
+                                        {{ t.batch_no_suggestions }} ({{ b.no_suggestion_count }})
+                                    </summary>
+                                    <p class="small text-muted mb-1">{{ t.batch_no_suggestions_hint }}</p>
+                                    <ul class="mb-0 ps-3">
+                                        <li v-for="(f, i) in b.no_suggestions" :key="i">
+                                            <strong>{{ f.label }}</strong
+                                            >: <span class="text-muted">{{ f.error }}</span>
+                                        </li>
+                                    </ul>
+                                </details>
                                 <details v-if="b.failures?.length" class="mt-1">
                                     <summary class="text-danger">
                                         {{ t.batch_failures }} ({{ b.failures.length }})

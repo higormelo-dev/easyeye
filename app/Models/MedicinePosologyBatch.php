@@ -26,6 +26,9 @@ class MedicinePosologyBatch extends Model
 
     public const PHASE_GENERATING = 'generating';
 
+    /** Provedor no limite de uso: a continuação está agendada para quando ele liberar. */
+    public const PHASE_RATE_LIMITED = 'rate_limited';
+
     /** Na fila sem começar por mais que isso = worker parado (o normal é segundos). */
     public const PENDING_STALL_SECONDS = 90;
 
@@ -155,6 +158,7 @@ class MedicinePosologyBatch extends Model
             'updated_count'       => (int) $this->updated_count,
             'skipped_count'       => (int) $this->skipped_count,
             'failed_groups'       => (int) $this->failed_groups,
+            'no_suggestion_count' => $this->groups()->where('status', MedicinePosologyBatchGroup::STATUS_NO_SUGGESTION)->count(),
             'ai_calls'            => (int) $this->ai_calls,
             'cost_usd'            => round((float) $this->cost_usd, 6),
             'cost_brl'            => $toBrl($this->cost_usd),

@@ -1,6 +1,7 @@
 <?php
 
 use App\Domains\AI\Contracts\AiProviderInterface;
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiProviderManager, AiProviderSettings};
 use App\Domains\AI\Services\AiRunExecutionService;
@@ -8,7 +9,7 @@ use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
 use App\Enums\AI\{AiProvider, AiRunStatus};
 use App\Enums\{MedicineSource, SaasRule};
 use App\Models\{Entity, Medicine, User};
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\{DB, Notification};
 use Inertia\Testing\AssertableInertia;
 
 /**
@@ -193,13 +194,36 @@ it('IA sem posologia segura: 422 com a observação dela', function () {
         ->assertJsonPath('message', 'Dose varia conforme a indicação.');
 });
 
-it('resposta que não é JSON: 422 pedindo preenchimento manual', function () {
+it('resposta que não é JSON: 422 "fora do formato" (falha do modelo, não recusa deliberada)', function () {
     fakePosologyAi('Não sei.');
 
     asPosologyAdmin()
         ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
         ->assertStatus(422)
-        ->assertJsonPath('message', __('manager_medicines.ai_no_suggestion'));
+        ->assertJsonPath('reason', 'invalid_output')
+        ->assertJsonPath('message', __('manager_medicines.ai_bad_format', ['provider' => AiProvider::OpenAI->label()]));
+});
+
+it('JSON sem os campos de dose (chaves trocadas, objeto vazio): fora do formato, não "sem posologia"', function (string $reply) {
+    fakePosologyAi($reply);
+
+    asPosologyAdmin()
+        ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
+        ->assertStatus(422)
+        ->assertJsonPath('reason', 'invalid_output');
+})->with([
+    'chaves em português' => [json_encode(['posologia' => '1 gota', 'frequencia' => 'de 6/6h'])],
+    'objeto vazio'        => ['{}'],
+]);
+
+it('JSON sem dose/frequência: recusa deliberada, com a nota da IA', function () {
+    fakePosologyAi(json_encode(['dosage' => '', 'frequency' => '', 'duration' => '', 'instructions' => '', 'note' => 'Dose varia conforme a indicação.']));
+
+    asPosologyAdmin()
+        ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id])
+        ->assertStatus(422)
+        ->assertJsonPath('reason', 'no_suggestion')
+        ->assertJsonPath('message', 'Dose varia conforme a indicação.');
 });
 
 it('modelo de raciocínio que não devolve texto: erro próprio ("não concluiu"), não "sem posologia"', function () {
@@ -379,6 +403,26 @@ describe('escolha da IA', function () {
         'tempo esgotado' => ['cURL error 28: Operation timed out after 20002 milliseconds with 0 bytes received segredo', 'ai_failed_timeout'],
         'sobrecarga'     => ['Gemini request failed [503]: This model is currently experiencing high demand segredo', 'ai_failed_busy'],
         'outro erro'     => ['Gemini request failed [400]: segredo', 'ai_failed_provider'],
+        // Formato real de OpenAI/Anthropic/compatíveis: "[status/código]" (a regex antiga só casava "[503]").
+        'sobrecarga [status/código]' => ['Gemini request failed [503/unavailable]: segredo', 'ai_failed_busy'],
+    ]);
+
+    it('erro classificado do provedor: sem crédito e chave recusada não sugerem "tente de novo"; limite sim', function (string $category, string $cause, string $reason, string $tail) {
+        Notification::fake();
+        app(AiProviderSettings::class)->setEnabledCodes(['openai', 'gemini']);
+        fakePosologyAiByProvider(['gemini' => new AiProviderRequestException('Gemini request failed [429]: segredo', AiProvider::Gemini, 429, null, $category, 12.0)]);
+
+        $response = asPosologyAdmin()
+            ->postJson(route('manager.medicines.ai-posology'), ['medicine_id' => $this->cmed->id, 'provider' => 'gemini'])
+            ->assertStatus(422)
+            ->assertJsonPath('reason', $reason)
+            ->assertJsonPath('message', __('manager_medicines.' . $cause, ['provider' => AiProvider::Gemini->label()]) . ' ' . __('manager_medicines.' . $tail));
+
+        expect($response->getContent())->not->toContain('segredo');
+    })->with([
+        'sem crédito'    => [AiProviderRequestException::CATEGORY_QUOTA, 'ai_failed_quota', 'quota', 'ai_try_other_only'],
+        'chave recusada' => [AiProviderRequestException::CATEGORY_AUTH, 'ai_failed_auth', 'auth', 'ai_try_other_only'],
+        'limite de uso'  => [AiProviderRequestException::CATEGORY_RATE_LIMIT, 'ai_failed_limit', 'rate_limited', 'ai_try_other'],
     ]);
 
     it('IA "Configurada" no painel entra na escolha mesmo SEM papel no assistente (Principal primeiro)', function () {

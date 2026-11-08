@@ -15,8 +15,24 @@ class MedicinePosologyAiException extends RuntimeException
     /** Provedor demorou ou está sobrecarregado (vale tentar de novo). */
     public const TRANSIENT = 'transient';
 
-    /** A IA respondeu, mas sem posologia utilizável (sem dose/frequência ou texto inválido). */
+    /**
+     * A IA respondeu no formato pedido, mas sem dose/frequência — recusa
+     * DELIBERADA do prompt (regra 5: depende da indicação, sem segurança).
+     * Não é falha do provedor: o lote registra e segue.
+     */
     public const NO_SUGGESTION = 'no_suggestion';
+
+    /** A IA respondeu fora do formato (não é JSON): falha do modelo. */
+    public const INVALID_OUTPUT = 'invalid_output';
+
+    /** Limite por minuto do provedor: vale esperar $retryAfterSeconds (quando informado) e repetir. */
+    public const RATE_LIMITED = 'rate_limited';
+
+    /** Conta do provedor sem crédito/cota: repetir não adianta; o time já foi avisado. */
+    public const QUOTA = 'quota';
+
+    /** Chave do provedor recusada: repetir não adianta; o time já foi avisado. */
+    public const AUTH = 'auth';
 
     /**
      * A IA não devolveu texto nenhum — modelo de raciocínio que esgotou o
@@ -26,10 +42,15 @@ class MedicinePosologyAiException extends RuntimeException
     public const EMPTY_OUTPUT = 'empty_output';
 
     /**
-     * @param ?string $aiRunId execução de IA registrada (custo real no lote)
+     * @param ?string $aiRunId           execução de IA registrada (custo real no lote)
+     * @param ?float  $retryAfterSeconds espera pedida pelo provedor (RATE_LIMITED)
      */
-    public function __construct(string $message, public readonly ?string $reason = null, public readonly ?string $aiRunId = null)
-    {
+    public function __construct(
+        string $message,
+        public readonly ?string $reason = null,
+        public readonly ?string $aiRunId = null,
+        public readonly ?float $retryAfterSeconds = null,
+    ) {
         parent::__construct($message);
     }
 }

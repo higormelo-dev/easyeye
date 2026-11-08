@@ -60,13 +60,17 @@ class ProcessMedicinePosologyBatchJob implements ShouldQueue
         }
 
         try {
-            $more = $service->process($batch, max(0, (int) config('medicines.posology_batch.job_time_budget_seconds', 45)));
+            $continueIn = $service->process($batch, max(0, (int) config('medicines.posology_batch.job_time_budget_seconds', 45)));
         } finally {
             $lock->release();
         }
 
-        if ($more) {
-            self::dispatch($batch);
+        // Limite de uso do provedor: a continuação espera o que ele pediu, na
+        // fila (o worker fica livre); o plano gravado retoma do mesmo grupo.
+        if ($continueIn !== null) {
+            $continueIn > 0
+                ? self::dispatch($batch)->delay(now()->addSeconds($continueIn))
+                : self::dispatch($batch);
         }
     }
 

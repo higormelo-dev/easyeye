@@ -34,10 +34,9 @@ class AiCircuitBreakerService implements AiCircuitBreakerInterface
 
     public function isOpen(AiProvider $provider, ?string $entityId = null): bool
     {
-        $breaker = $this->findBreaker($provider, $entityId)
-            ?? $this->findBreaker($provider, null);
-
-        return $breaker?->isOpen() ?? false;
+        // Entity OU global: o global (trip — sem crédito, chave recusada, limite) vale para todos, mesmo para a
+        // entity que já tem a própria linha fechada.
+        return $this->openState($provider, $entityId) !== null;
     }
 
     public function recordSuccess(AiProvider $provider, ?string $entityId = null): void
@@ -97,11 +96,55 @@ class AiCircuitBreakerService implements AiCircuitBreakerInterface
             ]);
     }
 
+    public function trip(AiProvider $provider, string $triggerType, int $seconds): void
+    {
+        $breaker = AiCircuitBreaker::firstOrCreate(
+            ['provider_code' => $provider->value, 'entity_id' => null],
+            ['state' => 'closed', 'failure_count' => 0, 'failure_threshold' => $this->threshold],
+        );
+        $until = now()->addSeconds(max(1, $seconds));
+
+        // Nunca encurta um circuito já aberto por mais tempo (ex.: cota de 15 min e, no meio, um limite de 20 s).
+        if ($breaker->isOpen() && $breaker->open_until !== null && $breaker->open_until->greaterThan($until)) {
+            return;
+        }
+
+        $breaker->update([
+            'state'             => 'open',
+            'failure_count'     => $breaker->failure_count + 1,
+            'last_trigger_type' => $triggerType,
+            'last_failure_at'   => now(),
+            'open_until'        => $until,
+        ]);
+
+        Log::warning('AiCircuitBreaker: circuito aberto direto.', [
+            'provider'   => $provider->value,
+            'trigger'    => $triggerType,
+            'open_until' => $until->toIso8601String(),
+        ]);
+    }
+
+    public function openState(AiProvider $provider, ?string $entityId = null): ?array
+    {
+        foreach (array_unique([$entityId, null], SORT_REGULAR) as $scope) {
+            $breaker = $this->findBreaker($provider, $scope);
+
+            if ($breaker?->isOpen()) {
+                return ['trigger_type' => $breaker->last_trigger_type, 'open_until' => $breaker->open_until];
+            }
+        }
+
+        return null;
+    }
+
     private function findBreaker(AiProvider $provider, ?string $entityId): ?AiCircuitBreaker
     {
+        // O índice único não cobre entity_id NULL no PostgreSQL: dois workers podem criar
+        // a linha global ao mesmo tempo. Vale a última escrita (a do trip/falha mais recente).
         return AiCircuitBreaker::query()
             ->where('provider_code', $provider->value)
             ->where('entity_id', $entityId)
+            ->latest('updated_at')
             ->first();
     }
 }

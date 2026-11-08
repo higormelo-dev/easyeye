@@ -339,7 +339,7 @@ class MedicinesController extends Controller
         return MedicinePosologyBatch::query()
             ->with([
                 'user:id,name',
-                'groups' => fn ($q) => $q->where('status', MedicinePosologyBatchGroup::STATUS_FAILED)->orderBy('position'),
+                'groups' => fn ($q) => $q->whereIn('status', [MedicinePosologyBatchGroup::STATUS_FAILED, MedicinePosologyBatchGroup::STATUS_NO_SUGGESTION])->orderBy('position'),
             ])
             ->latest()
             ->limit(10)
@@ -350,14 +350,26 @@ class MedicinesController extends Controller
                 'filters_summary'    => $this->filtersSummary((array) $b->filters),
                 'estimated_cost_usd' => $b->estimated_cost_usd,
                 'cost_brl'           => round((float) $b->cost_usd * $rate['rate'], 4),
-                'failures'           => $b->groups->take(20)->map(fn (MedicinePosologyBatchGroup $g) => [
-                    'label' => $g->label,
-                    'error' => $g->error,
-                ])->values()->all(),
-                'created_at'  => $b->created_at?->isoFormat('L LT'),
-                'finished_at' => $b->finished_at?->isoFormat('L LT'),
+                'failures'           => $this->groupNotes($b, MedicinePosologyBatchGroup::STATUS_FAILED),
+                // A IA respondeu sem posologia de propósito (depende da indicação): não é falha.
+                'no_suggestions' => $this->groupNotes($b, MedicinePosologyBatchGroup::STATUS_NO_SUGGESTION),
+                'created_at'     => $b->created_at?->isoFormat('L LT'),
+                'finished_at'    => $b->finished_at?->isoFormat('L LT'),
             ])
             ->all();
+    }
+
+    /**
+     * Até 20 grupos do lote com o status pedido, com a mensagem/nota gravada.
+     *
+     * @return list<array{label: string, error: ?string}>
+     */
+    private function groupNotes(MedicinePosologyBatch $batch, string $status): array
+    {
+        return $batch->groups->where('status', $status)->take(20)->map(fn (MedicinePosologyBatchGroup $g) => [
+            'label' => $g->label,
+            'error' => $g->error,
+        ])->values()->all();
     }
 
     /**

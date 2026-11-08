@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Domains\AI\Contracts\AiRunRepositoryInterface;
-use App\Domains\AI\Exceptions\{AiImageNotDeidentifiedException, AiRunCancelledException};
+use App\Domains\AI\Exceptions\{AiImageNotDeidentifiedException, AiProviderRequestException, AiRunCancelledException};
 use App\Domains\AI\Models\{AiCreditLedgerEntry, AiRun};
 use App\Domains\AI\Support\AiDispatchAudit;
 use App\DTOs\AI\AiRequestData;
@@ -129,8 +129,15 @@ class AiRunExecutionService
             // que ainda não foi consumido. Não relança para o job não marcar failed.
             $this->compensateCancelledRun($run);
         } catch (Throwable $e) {
-            // Imagem sem tarja possível: a mensagem já é a do médico (sem provedor).
-            $this->compensateFailedRun($run, $e->getMessage(), doctorFacing: $e instanceof AiImageNotDeidentifiedException);
+            if ($e instanceof AiImageNotDeidentifiedException) {
+                // Imagem sem tarja possível: a mensagem já é a do médico (sem provedor).
+                $this->compensateFailedRun($run, $e->getMessage(), doctorFacing: true);
+            } elseif (($reason = $this->providerFailureReason($e)) !== null) {
+                Log::warning('AI run failure (raw)', ['reason' => $e->getMessage()]);
+                $this->compensateFailedRun($run, $reason, doctorFacing: true);
+            } else {
+                $this->compensateFailedRun($run, $e->getMessage());
+            }
 
             throw $e;
         }
@@ -173,6 +180,25 @@ class AiRunExecutionService
         Log::warning('AI run failure (raw)', ['reason' => $reason]);
 
         return __('ai.run_failed_generic');
+    }
+
+    /**
+     * Motivo para o médico quando o provedor disse POR QUE falhou — ainda sem
+     * citar provedor/modelo: limite ou sobrecarga ("tente em alguns minutos");
+     * sem crédito ou chave recusada ("indisponível, a equipe foi avisada" —
+     * AiOperationalAlerts já avisou). Demais: null (mensagem genérica).
+     */
+    private function providerFailureReason(Throwable $e): ?string
+    {
+        if (! $e instanceof AiProviderRequestException) {
+            return null;
+        }
+
+        return match (true) {
+            $e->needsHumanAction() => __('ai.run_failed_unavailable'),
+            $e->isRetryable()      => __('ai.run_failed_busy'),
+            default                => null,
+        };
     }
 
     /**

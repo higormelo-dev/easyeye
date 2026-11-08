@@ -24,9 +24,37 @@ class InMemoryAiCircuitBreaker implements AiCircuitBreakerInterface
     {
     }
 
+    /** @var array<string, string> último motivo por chave */
+    public array $triggers = [];
+
+    /** @var list<array{provider: string, trigger: string, seconds: int}> */
+    public array $trips = [];
+
     public function isOpen(AiProvider $provider, ?string $entityId = null): bool
     {
-        return $this->openCircuits[$this->key($provider, $entityId)] ?? false;
+        return ($this->openCircuits[$this->key($provider, $entityId)] ?? false)
+            || ($this->openCircuits[$this->key($provider, null)] ?? false);
+    }
+
+    public function trip(AiProvider $provider, string $triggerType, int $seconds): void
+    {
+        $key                      = $this->key($provider, null);
+        $this->openCircuits[$key] = true;
+        $this->triggers[$key]     = $triggerType;
+        $this->trips[]            = ['provider' => $provider->value, 'trigger' => $triggerType, 'seconds' => $seconds];
+    }
+
+    public function openState(AiProvider $provider, ?string $entityId = null): ?array
+    {
+        foreach (array_unique([$entityId, null], SORT_REGULAR) as $scope) {
+            $key = $this->key($provider, $scope);
+
+            if ($this->openCircuits[$key] ?? false) {
+                return ['trigger_type' => $this->triggers[$key] ?? null, 'open_until' => null];
+            }
+        }
+
+        return null;
     }
 
     public function recordSuccess(AiProvider $provider, ?string $entityId = null): void
@@ -39,6 +67,7 @@ class InMemoryAiCircuitBreaker implements AiCircuitBreakerInterface
     {
         $key                  = $this->key($provider, $entityId);
         $this->failures[$key] = ($this->failures[$key] ?? 0) + 1;
+        $this->triggers[$key] = $triggerType;
 
         if ($this->failures[$key] >= $this->testThreshold) {
             $this->openCircuits[$key] = true;

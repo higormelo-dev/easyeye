@@ -53,9 +53,18 @@ return [
         // Pausa entre chamadas (throttle simples para o limite do provedor).
         'delay_ms' => (int) env('MEDICINE_POSOLOGY_BATCH_DELAY_MS', 500),
 
-        // Novas tentativas de um grupo em erro transitório (demora/sobrecarga/429).
+        // Novas tentativas de um grupo em erro transitório (demora/sobrecarga).
         'retries'               => (int) env('MEDICINE_POSOLOGY_BATCH_RETRIES', 2),
         'retry_backoff_seconds' => [5, 15],
+
+        // Limite de uso do provedor (429 de limite por minuto): o grupo volta à
+        // fila e o lote continua depois da espera pedida (retry-after), sem
+        // gastar as tentativas acima. Desiste se o provedor pedir mais que
+        // max_rate_limit_wait_seconds (ex.: limite diário) ou depois de
+        // max_rate_limit_waits esperas seguidas sem avançar. Fica abaixo dos
+        // 240 s em que a tela considera o lote parado.
+        'max_rate_limit_waits'        => (int) env('MEDICINE_POSOLOGY_BATCH_MAX_RATE_LIMIT_WAITS', 10),
+        'max_rate_limit_wait_seconds' => (int) env('MEDICINE_POSOLOGY_BATCH_MAX_RATE_LIMIT_WAIT_SECONDS', 120),
 
         // Falhas seguidas que encerram o lote (provedor fora do ar: não gasta à toa).
         'max_consecutive_failures' => (int) env('MEDICINE_POSOLOGY_BATCH_MAX_CONSECUTIVE_FAILURES', 5),

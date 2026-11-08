@@ -142,6 +142,11 @@ return [
         'threshold' => (int) env('AI_BREAKER_THRESHOLD', 5),
         // Tempo (segundos) que o circuito fica aberto antes de tentar de novo.
         'cooldown_seconds' => (int) env('AI_BREAKER_COOLDOWN_SECONDS', 120),
+        // Sem crédito/cota ou chave recusada: abre o circuito GLOBAL na hora (sem esperar o limiar) e avisa o
+        // time (AiOperationalAlerts). Passado o prazo, uma chamada testa de novo (depois de recarregar a conta).
+        'human_action_cooldown_seconds' => (int) env('AI_BREAKER_HUMAN_ACTION_COOLDOWN_SECONDS', 900),
+        // Limite por minuto com espera informada (retry-after): suspende o provedor até lá, no máximo isto.
+        'rate_limit_max_open_seconds' => (int) env('AI_BREAKER_RATE_LIMIT_MAX_OPEN_SECONDS', 120),
     ],
 
     // Ditado por voz do laudo (Fase 5): o áudio vai ao backend e é transcrito por

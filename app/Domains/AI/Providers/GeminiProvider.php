@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\AI\Providers;
 
 use App\Domains\AI\Contracts\AiProviderInterface;
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Services\AiProviderSettings;
 use App\Domains\AI\Support\{PromptComposer, ProviderErrorSanitizer};
 use App\DTOs\AI\{AiProviderResponseData, AiRequestData, AiUsageData};
@@ -29,7 +30,7 @@ class GeminiProvider implements AiProviderInterface
             ->withUserAgent($this->userAgent())
             ->connectTimeout($this->connectTimeoutSeconds())
             ->timeout($this->timeoutSeconds())
-            ->retry($this->retryTimes(), $this->retrySleepMilliseconds(), null, false)
+            ->retry($this->retryTimes(), $this->retrySleepMilliseconds(), AiProviderRequestException::shouldRetryHttp(...), false)
             ->post($this->endpoint(), $payload);
 
         if (! $response->successful()) {
@@ -295,6 +296,6 @@ class GeminiProvider implements AiProviderInterface
 
         $safeMessage = ProviderErrorSanitizer::sanitize($rawMessage, 'Falha na integração Gemini.');
 
-        return new RuntimeException("Gemini request failed [{$status}]: {$safeMessage}");
+        return AiProviderRequestException::fromResponse(AiProvider::Gemini, $response, "Gemini request failed [{$status}]: {$safeMessage}");
     }
 }

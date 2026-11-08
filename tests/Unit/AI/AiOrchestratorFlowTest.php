@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\AI\Contracts\{AiModelPriceRepositoryInterface, AiProviderInterface};
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Models\{AiModelPrice, AiRun};
 use App\Domains\AI\Providers\Fakes\{AnthropicFakeProvider, GeminiFakeProvider, OpenAiFakeProvider};
 use App\Domains\AI\Services\{AiOrchestrator, AiPricingService, AiProviderManager, AiProviderSettings};
@@ -233,6 +234,68 @@ test('orchestrator pula provider quando circuit breaker já está aberto', funct
     expect($store->entries[0]['metadata']['reason'])->toBe('circuit_open');
     expect($store->entries[1]['status'])->toBe('success');
     expect($store->entries[1]['provider'])->toBe('anthropic');
+});
+
+test('limite de uso com espera informada: suspende o provedor só pelo tempo pedido (outras chamadas vão ao fallback)', function () {
+    $rateLimited = new class() implements AiProviderInterface {
+        public function generate(AiRequestData $request): AiProviderResponseData
+        {
+            throw new AiProviderRequestException('OpenAI request failed [429/rate_limit_exceeded]: x', AiProvider::OpenAI, 429, 'rate_limit_exceeded', AiProviderRequestException::CATEGORY_RATE_LIMIT, 19.2);
+        }
+
+        public function supportsVision(): bool
+        {
+            return false;
+        }
+
+        public function supportsJsonMode(): bool
+        {
+            return true;
+        }
+
+        public function provider(): AiProvider
+        {
+            return AiProvider::OpenAI;
+        }
+    };
+
+    $breaker = new InMemoryAiCircuitBreaker();
+    $manager = new AiProviderManager([
+        'openai'    => $rateLimited,
+        'anthropic' => new AnthropicFakeProvider(),
+        'gemini'    => new GeminiFakeProvider(),
+    ], new AiProviderSettings());
+    $orchestrator = new AiOrchestrator($manager, new InMemoryCallStore(), buildPricingServiceForOrchestrator(), $breaker);
+
+    $result = $orchestrator->execute(buildAiRun(AiRunMode::Economy), baseRequest(AiRunMode::Economy));
+
+    expect($result->finalOutput)->toContain('[ANTHROPIC FAKE]')
+        ->and($breaker->trips)->toBe([['provider' => 'openai', 'trigger' => 'rate_limit', 'seconds' => 20]])
+        ->and($breaker->failures)->toBe([]); // não conta no limiar de "provedor fora"
+});
+
+test('todos os provedores com o circuito aberto: o erro diz o motivo (ex.: sem crédito), sem chamar ninguém', function () {
+    $breaker = new InMemoryAiCircuitBreaker();
+    $breaker->trip(AiProvider::OpenAI, 'quota', 900);
+    $breaker->trip(AiProvider::Anthropic, 'quota', 900);
+    $breaker->trip(AiProvider::Gemini, 'quota', 900);
+    $store        = new InMemoryCallStore();
+    $orchestrator = new AiOrchestrator(new AiProviderManager([
+        'openai'    => new OpenAiFakeProvider(),
+        'anthropic' => new AnthropicFakeProvider(),
+        'gemini'    => new GeminiFakeProvider(),
+    ], new AiProviderSettings()), $store, buildPricingServiceForOrchestrator(), $breaker);
+
+    try {
+        $orchestrator->execute(buildAiRun(AiRunMode::Economy), baseRequest(AiRunMode::Economy));
+        $this->fail('deveria lançar');
+    } catch (AiProviderRequestException $e) {
+        expect($e->category)->toBe(AiProviderRequestException::CATEGORY_QUOTA)
+            ->and($e->httpStatus)->toBe(0)
+            ->and($e->provider)->toBe(AiProvider::OpenAI);
+    }
+
+    expect(collect($store->entries)->pluck('status')->unique()->all())->toBe(['skipped']);
 });
 
 test('[SEGURANÇA] reviewer e adjudicator recebem as saídas anteriores como <ai_draft> (dado), nunca como prompt cru', function () {

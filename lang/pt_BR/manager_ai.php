@@ -326,4 +326,16 @@ return [
     'setup_required_url'             => 'Este provedor não tem endereço padrão — defina também o endereço da API.',
     'setup_azure_note'               => 'No Azure AI Foundry, crie o deployment como Standard regional em swedencentral (UE) e dê a ele o nome do modelo (ex.: gpt-4o-mini). Global e Data Zone processam fora da UE.',
     'setup_maritaca_note'            => 'Prefira os modelos com sufixo "-br-sp": processam 100% no Brasil e dispensam o registro de transferência.',
+
+    // Alerta ao time do SaaS (AiOperationalAlerts): provedor parou por algo que só uma pessoa resolve.
+    'alerts' => [
+        'subject'  => '[Alerta IA] :what',
+        'greeting' => 'Olá, :name!',
+        'action'   => 'Abrir Provedores de IA',
+        'hint'     => 'Enquanto isso, as chamadas a este provedor ficam suspensas (as funções usam outra IA configurada, quando houver). Este alerta se repete no máximo uma vez por hora.',
+        'types'    => [
+            'quota' => ':provider recusou as chamadas por falta de crédito ou de cota na conta. Recarregue a conta no provedor; as chamadas voltam sozinhas em até 15 minutos.',
+            'auth'  => ':provider recusou a chave de acesso (inválida, revogada ou sem permissão). Troque a chave no .env do servidor e rode php artisan config:cache.',
+        ],
+    ],
 ];

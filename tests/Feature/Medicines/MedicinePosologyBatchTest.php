@@ -1,7 +1,8 @@
 <?php
 
 use App\Broadcasting\ManagerMedicinePosologyBatchChannel;
-use App\Domains\AI\Contracts\AiProviderInterface;
+use App\Domains\AI\Contracts\{AiCircuitBreakerInterface, AiProviderInterface};
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Models\{AiModelPrice, AiRun};
 use App\Domains\AI\Models\AiProviderTopup;
 use App\Domains\AI\Services\{AiProviderManager, AiProviderSettings};
@@ -11,8 +12,9 @@ use App\Enums\{ClientRule, ImportStatus, MedicinePosologySource, MedicineSource,
 use App\Events\ImportProgressUpdated;
 use App\Jobs\ProcessMedicinePosologyBatchJob;
 use App\Models\{AuditLog, Entity, Medicine, MedicinePosologyBatch, MedicinePosologyBatchGroup, User};
+use App\Notifications\AiOperationalAlertNotification;
 use App\Services\Medicines\{MedicineCatalogFilters, MedicinePosologyBatchService};
-use Illuminate\Support\Facades\{Cache, DB, Event, Http, Queue};
+use Illuminate\Support\Facades\{Cache, DB, Event, Http, Notification, Queue};
 use Illuminate\Support\Sleep;
 use Inertia\Testing\AssertableInertia;
 
@@ -466,7 +468,7 @@ describe('execução (job)', function () {
 
         $errors = $batch->groups()->where('status', MedicinePosologyBatchGroup::STATUS_FAILED)->pluck('error')->implode(' ');
         expect($errors)->not->toContain('segredo-interno')
-            ->and($errors)->toContain(__('manager_medicines.ai_no_suggestion'));
+            ->and($errors)->toContain(__('manager_medicines.ai_bad_format', ['provider' => AiProvider::OpenAI->label()]));
 
         // Histórico na tela mostra os grupos com falha.
         asBatchAdmin()->get(route('manager.medicines.index'))
@@ -516,6 +518,189 @@ describe('execução (job)', function () {
             ->and($batch->status)->toBe(ImportStatus::Failed)
             ->and($batch->error)->toContain(AiProvider::OpenAI->label())
             ->and($batch->groups()->where('status', MedicinePosologyBatchGroup::STATUS_PENDING)->count())->toBe(1);
+    });
+
+    it('IA sem posologia de propósito (depende da indicação) não é falha: o lote segue até o fim', function () {
+        // O caso real de 08/11: 5 "não é de uso oftálmico" seguidos derrubavam o lote como "OpenAI indisponível".
+        config(['medicines.posology_batch.max_consecutive_failures' => 2]);
+        batchMedicine(['name' => 'ZYLET', 'active_ingredient' => 'loteprednol', 'concentration' => '5 MG/ML', 'pharmaceutical_form' => 'suspensao_oftalmica']);
+        $note  = 'Uso não é oftálmico; posologia depende da indicação.';
+        $fakes = fakeBatchAi(fn () => batchPosologyJson(['dosage' => '', 'frequency' => '', 'duration' => '', 'instructions' => '', 'note' => $note]));
+
+        runBatchJob(startBatch());
+
+        $batch = MedicinePosologyBatch::query()->sole();
+        expect($fakes['openai']->requests)->toHaveCount(3)
+            ->and($batch->status)->toBe(ImportStatus::Done)
+            ->and($batch->error)->toBeNull()
+            ->and($batch->failed_groups)->toBe(0)
+            ->and($batch->processed_groups)->toBe(3)
+            ->and($batch->groups()->where('status', MedicinePosologyBatchGroup::STATUS_NO_SUGGESTION)->count())->toBe(3)
+            ->and($batch->progressPayload()['no_suggestion_count'])->toBe(3)
+            ->and($this->timolol->fresh()->dosage)->toBeNull();
+
+        asBatchAdmin()->get(route('manager.medicines.index'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('posologyBatches.0.failures', 0)
+                ->has('posologyBatches.0.no_suggestions', 3)
+                ->where('posologyBatches.0.no_suggestions.0.error', $note));
+    });
+
+    it('"sem posologia" no meio quebra a sequência de falhas', function () {
+        config(['medicines.posology_batch.max_consecutive_failures' => 2]);
+        batchMedicine(['name' => 'ZYLET', 'active_ingredient' => 'loteprednol', 'concentration' => '5 MG/ML', 'pharmaceutical_form' => 'suspensao_oftalmica']);
+        fakeBatchAi(fn (AiRequestData $r, int $call) => $call === 2
+            ? batchPosologyJson(['dosage' => '', 'frequency' => '', 'note' => 'Depende da indicação.'])
+            : new RuntimeException('OpenAI request failed [400/invalid_request]: x'));
+
+        runBatchJob(startBatch());
+
+        $batch = MedicinePosologyBatch::query()->sole();
+        expect($batch->status)->toBe(ImportStatus::Done)
+            ->and($batch->failed_groups)->toBe(2);
+    });
+
+    it('respostas vazias seguidas interrompem com o motivo certo (não "provedor indisponível")', function () {
+        config(['medicines.posology_batch.max_consecutive_failures' => 2]);
+        batchMedicine(['name' => 'ZYLET', 'active_ingredient' => 'loteprednol', 'concentration' => '5 MG/ML', 'pharmaceutical_form' => 'suspensao_oftalmica']);
+        fakeBatchAi(fn () => '');
+
+        runBatchJob(startBatch());
+
+        $batch = MedicinePosologyBatch::query()->sole();
+        expect($batch->status)->toBe(ImportStatus::Failed)
+            ->and($batch->error)->toBe(__('manager_medicines.batch_aborted_bad_output', ['count' => 2, 'provider' => AiProvider::OpenAI->label()]));
+    });
+
+    it('sem crédito na conta: para no 1º grupo sem marcar falha, avisa o time e abre o circuito', function () {
+        Notification::fake();
+        $fakes = fakeBatchAi(fn () => new AiProviderRequestException(
+            'OpenAI request failed [429/insufficient_quota]: You exceeded your current quota.',
+            AiProvider::OpenAI,
+            429,
+            'insufficient_quota',
+            AiProviderRequestException::CATEGORY_QUOTA,
+        ));
+
+        runBatchJob(startBatch());
+
+        $batch = MedicinePosologyBatch::query()->sole();
+        expect($fakes['openai']->requests)->toHaveCount(1)
+            ->and($batch->status)->toBe(ImportStatus::Failed)
+            ->and($batch->error)->toBe(__('manager_medicines.batch_aborted_quota', ['provider' => AiProvider::OpenAI->label()]))
+            ->and($batch->failed_groups)->toBe(0)
+            ->and($batch->groups()->where('status', MedicinePosologyBatchGroup::STATUS_PENDING)->count())->toBe(2)
+            ->and(app(AiCircuitBreakerInterface::class)->openState(AiProvider::OpenAI)['trigger_type'] ?? null)->toBe('quota')
+            // O usuário vê "indisponível, equipe avisada" — sem o nome do provedor.
+            ->and(AiRun::withoutGlobalScopes()->sole()->error_message)->toBe(__('ai.run_failed_unavailable'));
+
+        Notification::assertSentTo($this->admin, AiOperationalAlertNotification::class, fn (AiOperationalAlertNotification $n) => $n->type === 'quota');
+
+        // Outro lote no mesmo episódio: o circuito aberto barra antes de chamar a IA, com o mesmo motivo.
+        $again = startBatch();
+        runBatchJob($again);
+
+        expect($fakes['openai']->requests)->toHaveCount(1)
+            ->and($again->fresh()->error)->toBe(__('manager_medicines.batch_aborted_quota', ['provider' => AiProvider::OpenAI->label()]));
+        Notification::assertSentToTimes($this->admin, AiOperationalAlertNotification::class, 1);
+    });
+
+    it('limite de uso: o grupo volta à fila e o lote continua depois da espera pedida, sem marcar falha', function () {
+        Queue::fake();
+        $fakes = fakeBatchAi(fn (AiRequestData $r, int $call) => $call === 1
+            ? new AiProviderRequestException('OpenAI request failed [429/rate_limit_exceeded]: Rate limit reached.', AiProvider::OpenAI, 429, 'rate_limit_exceeded', AiProviderRequestException::CATEGORY_RATE_LIMIT, 20.0)
+            : batchPosologyJson());
+        $batch = startBatch(['search' => 'timolol']);
+
+        runBatchJob($batch);
+
+        $batch->refresh();
+        expect($batch->status)->toBe(ImportStatus::Processing)
+            ->and($batch->phase)->toBe(MedicinePosologyBatch::PHASE_RATE_LIMITED)
+            ->and($batch->failed_groups)->toBe(0)
+            ->and($batch->ai_calls)->toBe(1)
+            ->and($batch->groups()->sole()->status)->toBe(MedicinePosologyBatchGroup::STATUS_PENDING);
+        Queue::assertPushed(ProcessMedicinePosologyBatchJob::class, fn ($job) => $job->batch->is($batch) && $job->delay !== null);
+
+        // Passada a espera (o circuito do provedor reabre), a continuação conclui o grupo.
+        $this->travel(25)->seconds();
+        runBatchJob($batch);
+
+        expect($batch->fresh()->status)->toBe(ImportStatus::Done)
+            ->and($batch->fresh()->updated_count)->toBe(1)
+            ->and($fakes['openai']->requests)->toHaveCount(2)
+            // A execução que bateu no limite mostra "muita demanda" (sem citar o provedor).
+            ->and(AiRun::withoutGlobalScopes()->orderBy('created_at')->first()->error_message)->toBe(__('ai.run_failed_busy'));
+    });
+
+    it('limite que pede mais do que o lote aguarda (ex.: diário): interrompe com o motivo', function () {
+        config(['medicines.posology_batch.max_rate_limit_wait_seconds' => 60]);
+        Queue::fake();
+        fakeBatchAi(fn () => new AiProviderRequestException('OpenAI request failed [429/rate_limit_exceeded]: Rate limit reached for requests per day.', AiProvider::OpenAI, 429, 'rate_limit_exceeded', AiProviderRequestException::CATEGORY_RATE_LIMIT, 3600.0));
+
+        runBatchJob(startBatch(['search' => 'timolol']));
+
+        $batch = MedicinePosologyBatch::query()->sole();
+        expect($batch->status)->toBe(ImportStatus::Failed)
+            ->and($batch->error)->toBe(__('manager_medicines.batch_aborted_rate_limit', ['provider' => AiProvider::OpenAI->label()]))
+            ->and($batch->groups()->sole()->status)->toBe(MedicinePosologyBatchGroup::STATUS_PENDING);
+        Queue::assertNothingPushed();
+    });
+
+    it('limite que pede exatamente o teto de espera: espera (não interrompe)', function () {
+        config(['medicines.posology_batch.max_rate_limit_wait_seconds' => 60]);
+        Queue::fake();
+        fakeBatchAi(fn () => new AiProviderRequestException('OpenAI request failed [429/rate_limit_exceeded]: Rate limit reached.', AiProvider::OpenAI, 429, 'rate_limit_exceeded', AiProviderRequestException::CATEGORY_RATE_LIMIT, 60.0));
+        $batch = startBatch(['search' => 'timolol']);
+
+        runBatchJob($batch);
+
+        expect($batch->fresh()->status)->toBe(ImportStatus::Processing)
+            ->and($batch->fresh()->phase)->toBe(MedicinePosologyBatch::PHASE_RATE_LIMITED);
+        Queue::assertPushed(ProcessMedicinePosologyBatchJob::class, 1);
+    });
+
+    it('cancelado enquanto a IA respondia "sem crédito": o cancelamento vale (não vira "falhou")', function () {
+        Notification::fake();
+        fakeBatchAi(function () {
+            MedicinePosologyBatch::query()->update(['status' => ImportStatus::Cancelled->value, 'error' => __('manager_medicines.batch_cancelled_reason')]);
+
+            return new AiProviderRequestException('OpenAI request failed [429/insufficient_quota]: x', AiProvider::OpenAI, 429, 'insufficient_quota', AiProviderRequestException::CATEGORY_QUOTA);
+        });
+
+        runBatchJob(startBatch());
+
+        $batch = MedicinePosologyBatch::query()->sole();
+        expect($batch->status)->toBe(ImportStatus::Cancelled)
+            ->and($batch->error)->toBe(__('manager_medicines.batch_cancelled_reason'));
+    });
+
+    it('limite sem espera informada: espera 5, 10 s… e desiste depois de várias esperas sem avançar', function () {
+        config(['medicines.posology_batch.max_rate_limit_waits' => 2]);
+        Queue::fake();
+        fakeBatchAi(fn () => new AiProviderRequestException('OpenAI request failed [429/rate_limit_exceeded]: Rate limit reached.', AiProvider::OpenAI, 429, 'rate_limit_exceeded', AiProviderRequestException::CATEGORY_RATE_LIMIT));
+        $batch = startBatch(['search' => 'timolol']);
+
+        runBatchJob($batch);
+        runBatchJob($batch);
+        expect($batch->fresh()->status)->toBe(ImportStatus::Processing);
+
+        runBatchJob($batch);
+
+        expect($batch->fresh()->status)->toBe(ImportStatus::Failed)
+            ->and($batch->fresh()->error)->toBe(__('manager_medicines.batch_aborted_rate_limit', ['provider' => AiProvider::OpenAI->label()]));
+        Queue::assertPushed(ProcessMedicinePosologyBatchJob::class, 2);
+    });
+
+    it('sobrecarga no formato real "[503/código]" ganha nova tentativa (a regex antiga não reconhecia)', function () {
+        $fakes = fakeBatchAi(fn (AiRequestData $r, int $call) => $call === 1
+            ? new RuntimeException('OpenAI request failed [503/server_error]: The server had an error')
+            : batchPosologyJson());
+
+        runBatchJob(startBatch(['search' => 'timolol']));
+
+        expect($fakes['openai']->requests)->toHaveCount(2)
+            ->and(MedicinePosologyBatch::query()->sole()->updated_count)->toBe(1);
     });
 
     it('cancelado antes de começar: o job não chama a IA', function () {

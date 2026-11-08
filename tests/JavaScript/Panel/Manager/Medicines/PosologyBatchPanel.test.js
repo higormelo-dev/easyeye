@@ -215,6 +215,34 @@ describe('PosologyBatchPanel', () => {
         expect(row).toContain('timolol 5 MG/ML · Solução oftálmica');
     });
 
+    it('"sem posologia sugerida" aparece à parte das falhas (resposta da IA, não erro), no histórico e no quadro ao vivo', () => {
+        const noSuggestion = {
+            label: 'anlodipino 5 MG · comprimido',
+            error: 'Uso não é oftálmico; depende da indicação.',
+        };
+        const wrapper = mountPanel({
+            running: { ...running, failed_groups: 0, no_suggestion_count: 1 },
+            batches: [
+                {
+                    ...running,
+                    status: 'done',
+                    is_done: true,
+                    failed_groups: 0,
+                    no_suggestion_count: 1,
+                    failures: [],
+                    no_suggestions: [noSuggestion],
+                },
+            ],
+        });
+        const row = wrapper.find('[data-test="batch-row"]');
+
+        expect(row.text()).toContain('batch_result_no_suggestion: 1');
+        expect(row.text()).toContain('batch_no_suggestions (1)');
+        expect(row.text()).toContain(noSuggestion.error);
+        expect(row.find('summary.text-danger').exists()).toBe(false);
+        expect(wrapper.text()).toContain('batch_result_no_suggestion');
+    });
+
     it('histórico vazio', () => {
         expect(mountPanel().text()).toContain('batch_empty');
     });

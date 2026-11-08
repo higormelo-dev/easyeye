@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Medicines;
 
+use App\Domains\AI\Exceptions\AiProviderRequestException;
 use App\Domains\AI\Models\AiRun;
 use App\Domains\AI\Services\{AiPayloadEnricher, AiProviderSettings, AiRunExecutionService};
 use App\Domains\AI\Support\AiJsonOutput;
@@ -170,9 +171,9 @@ class MedicinePosologyAiService
                 'error'     => $e->getMessage(),
             ]);
 
-            [$message, $transient] = $this->failureMessage($e, $chosen['label']);
+            [$message, $reason, $retryAfter] = $this->failure($e, $chosen['label']);
 
-            throw new MedicinePosologyAiException($message, $transient ? MedicinePosologyAiException::TRANSIENT : null, (string) $run->id);
+            throw new MedicinePosologyAiException($message, $reason, (string) $run->id, $retryAfter);
         }
 
         $run->refresh();
@@ -186,7 +187,15 @@ class MedicinePosologyAiService
             throw new MedicinePosologyAiException(__('manager_medicines.ai_empty_output', ['provider' => $chosen['label']]), MedicinePosologyAiException::EMPTY_OUTPUT, (string) $run->id);
         }
 
-        $suggestion = $this->normalize(AiJsonOutput::decode((string) $run->final_output) ?? []);
+        $decoded = AiJsonOutput::decode((string) $run->final_output);
+
+        // Fora do formato pedido (texto solto, ou JSON sem os campos de dose): falha do
+        // modelo, não recusa deliberada — a recusa vem no formato, com os campos vazios.
+        if ($decoded === null || (! array_key_exists('dosage', $decoded) && ! array_key_exists('frequency', $decoded))) {
+            throw new MedicinePosologyAiException(__('manager_medicines.ai_bad_format', ['provider' => $chosen['label']]), MedicinePosologyAiException::INVALID_OUTPUT, (string) $run->id);
+        }
+
+        $suggestion = $this->normalize($decoded);
 
         if ($suggestion['dosage'] === '' && $suggestion['frequency'] === '') {
             throw new MedicinePosologyAiException($suggestion['note'] !== '' ? $suggestion['note'] : __('manager_medicines.ai_no_suggestion'), MedicinePosologyAiException::NO_SUGGESTION, (string) $run->id);
@@ -196,27 +205,42 @@ class MedicinePosologyAiService
     }
 
     /**
-     * Mensagem para o admin: QUAL IA falhou e o tipo (demora / sobrecarga do
-     * provedor) — nunca o texto técnico do provedor. Com outra IA disponível,
-     * sugere escolher outra. Demora/sobrecarga = transitório (o lote tenta de novo).
+     * Mensagem para o admin: QUAL IA falhou e o tipo — nunca o texto técnico
+     * do provedor — e o motivo para quem chama decidir (o lote espera o
+     * limite, para na falta de crédito, repete a sobrecarga).
      *
-     * @return array{0: string, 1: bool} mensagem e se o erro é transitório
+     * Pela categoria do erro do provedor (AiProviderRequestException); sem
+     * ela (rede, provedores falsos), pelo texto: "[503]" ou "[503/…]".
+     *
+     * @return array{0: string, 1: ?string, 2: ?float} mensagem, motivo (MedicinePosologyAiException::*), espera pedida em segundos
      */
-    private function failureMessage(Throwable $e, string $provider): array
+    private function failure(Throwable $e, string $provider): array
     {
-        $raw = strtolower($e->getMessage());
+        $raw        = strtolower($e->getMessage());
+        $structured = $e instanceof AiProviderRequestException ? $e : null;
 
-        $cause = match (true) {
-            str_contains($raw, 'curl error 28') || str_contains($raw, 'timed out') || str_contains($raw, 'timeout')                         => 'ai_failed_timeout',
-            (bool) preg_match('/\[(429|500|502|503|504)\]/', $raw) || str_contains($raw, 'high demand') || str_contains($raw, 'overloaded') => 'ai_failed_busy',
-            default                                                                                                                         => 'ai_failed_provider',
+        [$cause, $reason] = match (true) {
+            $structured?->category === AiProviderRequestException::CATEGORY_QUOTA => ['ai_failed_quota', MedicinePosologyAiException::QUOTA],
+            $structured?->category === AiProviderRequestException::CATEGORY_AUTH  => ['ai_failed_auth', MedicinePosologyAiException::AUTH],
+            // Limite por minuto, ou circuito aberto esfriando depois de falhas seguidas: esperar o prazo.
+            $structured?->category === AiProviderRequestException::CATEGORY_RATE_LIMIT                                                                     => ['ai_failed_limit', MedicinePosologyAiException::RATE_LIMITED],
+            $structured !== null && $structured->httpStatus === 0                                                                                          => ['ai_failed_busy', MedicinePosologyAiException::RATE_LIMITED],
+            $structured?->category === AiProviderRequestException::CATEGORY_OVERLOADED                                                                     => ['ai_failed_busy', MedicinePosologyAiException::TRANSIENT],
+            $structured !== null                                                                                                                           => ['ai_failed_provider', null],
+            str_contains($raw, 'curl error 28') || str_contains($raw, 'timed out') || str_contains($raw, 'timeout')                                        => ['ai_failed_timeout', MedicinePosologyAiException::TRANSIENT],
+            (bool) preg_match('/\[(429|500|502|503|504|529)(\/[^\]]*)?\]/', $raw) || str_contains($raw, 'high demand') || str_contains($raw, 'overloaded') => ['ai_failed_busy', MedicinePosologyAiException::TRANSIENT],
+            default                                                                                                                                        => ['ai_failed_provider', null],
         };
 
         $message = __('manager_medicines.' . $cause, ['provider' => $provider]);
+        $other   = count($this->providers()) > 1;
 
-        $message = count($this->providers()) > 1 ? $message . ' ' . __('manager_medicines.ai_try_other') : $message . ' ' . __('manager_medicines.ai_try_again');
+        // Sem crédito / chave recusada: "tente de novo" não adianta — só outra IA.
+        $message = in_array($reason, [MedicinePosologyAiException::QUOTA, MedicinePosologyAiException::AUTH], true)
+            ? ($other ? $message . ' ' . __('manager_medicines.ai_try_other_only') : $message)
+            : $message . ' ' . __($other ? 'manager_medicines.ai_try_other' : 'manager_medicines.ai_try_again');
 
-        return [$message, $cause !== 'ai_failed_provider'];
+        return [$message, $reason, $structured?->retryAfterSeconds];
     }
 
     /**
