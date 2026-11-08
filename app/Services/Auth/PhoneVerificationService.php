@@ -71,6 +71,9 @@ class PhoneVerificationService
         // Meta: template (parâmetros, inexistente/não aprovado, tradução,
         // política, formato, pausado, desativado).
         'meta_132000', 'meta_132001', 'meta_132005', 'meta_132007', 'meta_132012', 'meta_132015', 'meta_132016',
+        // Conta self-serve (`api_key`): modelo fora da lista de aprovados do app — não existe, não foi aprovado
+        // ou o app é de Sandbox (só tem os modelos da Gupshup). Sem isto o cadastro ficava preso, sem alerta.
+        'template_not_found',
     ];
 
     /**

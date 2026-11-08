@@ -423,7 +423,7 @@ describe('10. falhas de configuração em lista branca', function () {
             expect(PhoneVerificationService::isConfigurationFailure($code))->toBeFalse("{$code} não é configuração");
         }
 
-        foreach (['missing_app', 'missing_partner_credentials', 'auth_failed', 'meta_132001', 'meta_132015', 'meta_132016', 'meta_131030', 'gupshup_4003', 'gupshup_4005', 'gupshup_1001', 'gupshup_1009'] as $code) {
+        foreach (['missing_app', 'missing_partner_credentials', 'auth_failed', 'meta_132001', 'meta_132015', 'meta_132016', 'meta_131030', 'gupshup_4003', 'gupshup_4005', 'gupshup_1001', 'gupshup_1009', 'template_not_found'] as $code) {
             expect(PhoneVerificationService::isConfigurationFailure($code))->toBeTrue("{$code} é configuração");
         }
     });
@@ -439,6 +439,22 @@ describe('10. falhas de configuração em lista branca', function () {
         ]);
 
         expect(frGate($user))->toBe(302);
+    });
+
+    it('modelo do código fora do app (self-serve, ex.: app Sandbox): solta o gate e avisa o time', function () {
+        // Produção em 08/11/2026: modo api_key com GUPSHUP_SANDBOX=true — o app de Sandbox só tem os modelos da
+        // Gupshup, então todo código de cadastro voltaria template_not_found e a pessoa ficaria presa, sem alerta.
+        $global = frGlobal(['app_id' => 'global-tnf-fr']);
+        $user   = User::factory()->create(['phone' => '11977776666']);
+        useGupshupDriver();
+
+        WhatsAppMessage::create([
+            'whatsapp_setting_id' => $global->id, 'direction' => 'out', 'kind' => WhatsAppMessage::KIND_VERIFICATION, 'phone' => '5511977776666',
+            'body'                => 'código ******', 'status' => 'failed', 'error_code' => 'template_not_found', 'failed_at' => now(), 'payload' => ['user_id' => (string) $user->id],
+        ]);
+
+        expect(frGate($user))->toBe(200)
+            ->and(Cache::has('whatsapp:verification-undeliverable:' . $user->id))->toBeTrue();
     });
 });
 
