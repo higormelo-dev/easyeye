@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\AI\Services;
 
 use App\Enums\AI\AiProvider;
-use App\Enums\SaasRule;
 use App\Models\User;
 use App\Notifications\AiOperationalAlertNotification;
 use App\Support\Billing\NoticeLocale;
+use App\Support\SaasAlertRecipients;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\{Cache, Log};
 use Throwable;
@@ -44,20 +44,9 @@ class AiOperationalAlerts
         }
     }
 
-    /**
-     * Admin e dono do SaaS (vínculo ativo numa empresa que não é cliente),
-     * com e-mail verificado — os mesmos do alerta do WhatsApp.
-     *
-     * @return Collection<int, User>
-     */
+    /** @return Collection<int, User> admin e dono do SaaS com e-mail verificado */
     public static function recipients(): Collection
     {
-        return User::query()
-            ->whereNotNull('users.email_verified_at')
-            ->whereHas('entityUsers', fn ($q) => $q->where('active', true)
-                ->whereHas('entity', fn ($e) => $e->where('is_client', false))
-                ->where(fn ($role) => $role->where('rule', SaasRule::Admin->value)->orWhere('is_owner', true)))
-            ->orderBy('users.id')
-            ->get();
+        return SaasAlertRecipients::get();
     }
 }

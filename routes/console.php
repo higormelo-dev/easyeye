@@ -373,6 +373,14 @@ Schedule::command('fiscal:nfse-sync')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// Fila parada (worker caído ou crontab sem a fila): avisa o time — em 08/11/2026 a critical e a bulk
+// ficaram 6+ dias sem consumidor sem ninguém saber.
+Schedule::command('queue:check-stalled')
+    ->everyFiveMinutes()
+    ->name('queue:check-stalled')
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // Falhas de job antigas: 30 dias bastam para diagnóstico; sem isto failed_jobs cresce sem teto.
 Schedule::command('queue:prune-failed --hours=720')
     ->dailyAt('04:20')

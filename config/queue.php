@@ -30,6 +30,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Fila parada (queue:check-stalled, a cada 5 min)
+    |--------------------------------------------------------------------------
+    |
+    | O job da frente de uma fila sem mudar por este tempo = ninguém consome
+    | (worker parado, ou o crontab sem esta fila no --queue): Log::critical e
+    | e-mail ao time na hora (sem passar pela fila). A bulk tem prazo maior:
+    | um job dela leva até 15 min e o próximo espera na frente.
+    |
+    */
+
+    'stalled_alert' => [
+        'minutes'      => (int) env('QUEUE_STALLED_ALERT_MINUTES', 15),
+        'bulk_minutes' => (int) env('QUEUE_STALLED_ALERT_BULK_MINUTES', 45),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Queue Connections
     |--------------------------------------------------------------------------
     |

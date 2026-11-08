@@ -69,6 +69,8 @@ Por que dois fast com ordens diferentes: uma rajada sustentada em `critical` (ex
 
 Aplicar: editar o crontab → `php artisan schedule:clear-cache` → `php artisan queue:restart` (a crontab não vem do `git pull`). **Com 1 fast só, `default`/TISS podem ficar sem consumo sob rajada de `critical`; não usar.** Mesmo com os dois fast, a `critical` só ganha *entre* jobs: um job TISS de 120 s atrasa um OTP no processo que o pegou (o outro fast atende o OTP).
 
+**Fila parada (automático):** `queue:check-stalled` roda a cada 5 min pelo agendador. Se o job da frente de uma fila não muda há 15 min (45 min na `bulk`), grava `Log::critical` e manda e-mail na hora ao admin e ao dono do SaaS, no máximo 1x/h por fila. Prazos em `QUEUE_STALLED_ALERT_MINUTES` e `QUEUE_STALLED_ALERT_BULK_MINUTES`. Em 08/11/2026 a `critical` e a `bulk` ficaram 6+ dias sem consumidor (crontab com 1 worker sem `--queue`) sem nenhum aviso.
+
 **Monitoramento (sem serviço novo):** `redis-cli llen queues:critical`, `redis-cli llen queues:default` e `redis-cli llen queues:tiss-xml` (com o prefixo da aplicação, ex.: `easyeye_database_queues:critical`; `redis-cli --scan --pattern '*queues:*'` mostra as chaves). `default` ou TISS crescendo enquanto `critical` não zera = só há um fast rodando (ou o crontab ainda tem a linha antiga); o `queue:monitor` da §5 alerta quando passa de `--max`.
 
 **Local** — o `queue:listen` do `composer dev` lê só `default`. Para OTP/webhook: `queue:listen --queue=critical,default`; para importações, um segundo worker `queue:work redis-bulk --queue=bulk` (ou `queue:work database --queue=bulk` quando a fila local é a tabela `jobs`).
