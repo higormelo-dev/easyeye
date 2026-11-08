@@ -1,0 +1,17 @@
+{
+    "indexer.exclude_patterns": [
+        "/vendor/**/Tests/**/*",
+        "/vendor/**/tests/**/*",
+        "/vendor/composer/**/*",
+        "/vendor/rector/rector/stubs-rector",
+        "/_ide_helper.php",
+        "/_ide_helper_models.php"
+    ],
+    "language_server.diagnostic_ignore_codes": [
+        "worse.docblock_missing_return_type",
+        "worse.docblock_missing_param",
+        "worse.docblock_missing_class_generic",
+        "worse.unused_import",
+        "worse.assignment_to_missing_property"
+    ]
+}

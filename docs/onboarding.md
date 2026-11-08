@@ -22,6 +22,8 @@ Reutilize `vendor/` e `node_modules/` existentes quando coerentes com os lockfil
 
 Configure o ambiente local pelo procedimento da equipe, sem publicar ou imprimir valores. Variáveis relevantes incluem `APP_ENV`, `APP_KEY`, `APP_URL`, `DB_CONNECTION`, `DB_HOST`, `DB_PORT`, `DB_DATABASE`, fila, cache, sessão e flags dos provedores. Não copie credenciais de produção. Uma instalação já configurada não precisa regenerar chave, aplicar migrations ou semear dados como preflight.
 
+Editor (Zed com Phpactor): o [.phpactor.json](../.phpactor.json) tira `_ide_helper.php` e `_ide_helper_models.php` do índice, porque eles redeclaram modelos e classes do framework como classes vazias e o Phpactor passava a apontar `App\Models\Patient` para o stub (daí erros falsos como "Method exams does not exist"), e esconde avisos de estilo (`@param`/`@return` genéricos, import agrupado, atributo do Eloquent). Não muda a execução do app nem os testes. O Phpactor só lê configuração de pasta confiável: depois de clonar, rode `php ~/.local/share/zed/extensions/work/php/phpactor-*/phpactor.phar config:trust --trust` e reinicie o language server (`editor: restart language server`). Sobram erros de magia do Laravel (`Patient::where()`, macros), que não indicam bug.
+
 ## Banco e testes PHP
 
 O [phpunit.xml](../phpunit.xml) seleciona PostgreSQL e **`easyeye_test`**, único banco autorizado para testes. O fallback SQLite de `config/database.php` não é o destino dos testes. Antes de testes que sobem Laravel, confirme configuração efetiva, ambiente local/testing, host local, nome exato do banco, ausência de outro escritor e bloqueio de envios externos reais. Não registre senhas nessa verificação.

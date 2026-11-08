@@ -26,7 +26,6 @@
 .env.testing
 .env.local
 .env.docker
-.phpactor.json
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
