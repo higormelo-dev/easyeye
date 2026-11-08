@@ -41,6 +41,17 @@ Cypress.Commands.add('loginAs', (key) => {
             // NÃO clicar no toggle "olho" antes de digitar (viraria type=text).
             cy.get('form input[type=password]').should('be.visible').clear().type(profile.password, { log: false });
             cy.get('form button[type=submit]').should('not.be.disabled').click();
+            if (!isPatient) {
+                // Gate terms.accepted: perfil seedado sem aceite da versão vigente dos
+                // Termos/Política cai em /accept-terms — aceita como um usuário faria.
+                cy.location('pathname', { timeout: 20000 }).should('not.eq', loginUrl);
+                cy.location('pathname').then((path) => {
+                    if (path === '/accept-terms') {
+                        cy.get('#terms-reaccept').check();
+                        cy.get('form[action="/accept-terms"] button[type=submit]').should('not.be.disabled').click();
+                    }
+                });
+            }
             // Landing por URL: clínica -> /panel/dashboard, SaaS -> /panel/manager/dashboard,
             // paciente -> /meus-documentos.
             cy.url({ timeout: 20000 }).should('include', profile.landing);

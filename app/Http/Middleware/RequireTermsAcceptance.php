@@ -10,11 +10,16 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Garante que o usuário aceitou os documentos legais obrigatórios (versão vigente).
- * LGPD Art. 8 — o consentimento deve ser obtido antes do início do tratamento de dados.
+ * Garante que o usuário da clínica aceitou a versão VIGENTE dos documentos legais obrigatórios (Termos de Uso e
+ * Política de Privacidade) — inclusive depois que uma versão nova é publicada (reaceite, LGPD art. 9º; lacuna G21).
+ * Pendente → tela de aceite (`terms.accept`), guardando a URL pedida para voltar depois.
  *
- * Redireciona para a página de aceite caso haja pendências.
- * Rotas isentas: auth, logout, locale, termos, e session-ping.
+ * Deixa passar:
+ *  - sem usuário (o `auth` do grupo trata);
+ *  - impersonação ("usar como"): o operador do SaaS não pode aceitar em nome do usuário — o aceite fica para quando
+ *    o próprio usuário entrar;
+ *  - contexto do SaaS (entity da sessão não é clínica): os Termos de Uso são o contrato com a clínica;
+ *  - nenhum documento obrigatório vigente (TermsService::currentRequired vazio: nada a aceitar).
  */
 class RequireTermsAcceptance
 {
@@ -25,20 +30,19 @@ class RequireTermsAcceptance
 
     public function handle(Request $request, Closure $next): Response
     {
-        if (! $request->user()) {
-            return $next($request);
-        }
+        $user = $request->user();
 
-        if ($this->termsService->hasAcceptedAll($request->user())) {
+        if (! $user
+            || session()->has('impersonating.entity_user_id')
+            || ! session('selected_entity_is_client', true)
+            || $this->termsService->hasAcceptedAll($user)) {
             return $next($request);
         }
 
         if ($request->expectsJson()) {
-            return response()->json([
-                'message' => 'É necessário aceitar os termos de uso e política de privacidade para continuar.',
-            ], 403);
+            return response()->json(['message' => __('auth.terms_reaccept.required_json')], Response::HTTP_FORBIDDEN);
         }
 
-        return redirect()->route('terms.accept');
+        return redirect()->guest(route('terms.accept'));
     }
 }

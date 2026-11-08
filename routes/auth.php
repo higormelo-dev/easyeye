@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\{
     PasswordResetLinkController,
     PhoneVerificationController,
     RegisteredUserController,
+    TermsAcceptanceController,
     UserInvitationResponseController,
     VerifyEmailController
 };
@@ -106,6 +107,18 @@ Route::middleware('auth')->group(function () {
     Route::post('phone/verification-confirm', [PhoneVerificationController::class, 'confirm'])
         ->middleware('throttle:6,1')
         ->name('phone.verification.confirm');
+
+    // ── Reaceite dos Termos de Uso e da Política de Privacidade (LGPD art. 9º) ────────
+    // O gate `terms.accepted` (grupo /panel) redireciona para cá enquanto houver versão vigente
+    // não aceita. Mesmos gates do painel ANTES dele (e-mail, WhatsApp, clínica, 2FA): só quem
+    // terminou a autenticação aceita contrato. Fora do gate, para não entrar em loop.
+    Route::middleware(['verified', 'phone.verified', 'entity.selected', '2fa'])->group(function () {
+        Route::get('accept-terms', [TermsAcceptanceController::class, 'show'])
+            ->name('terms.accept');
+        Route::post('accept-terms', [TermsAcceptanceController::class, 'store'])
+            ->middleware('throttle:10,1')
+            ->name('terms.accept.store');
+    });
 
     Route::get('confirm-password', [ConfirmablePasswordController::class, 'show'])
         ->name('password.confirm');

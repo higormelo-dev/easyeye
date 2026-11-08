@@ -188,7 +188,7 @@ Route::get('/call-panel/{token}/feed', [CallPanelDisplayController::class, 'feed
 // de confirmação/2FA ficam fora desses gates, e depois delas o dashboard
 // passa pelo check.subscription e volta para cá.
 Route::get('/subscription/expired', SubscriptionExpiredController::class)
-    ->middleware(['auth', 'verified', 'phone.verified', 'entity.selected', '2fa', 'checkout.csp'])
+    ->middleware(['auth', 'verified', 'phone.verified', 'entity.selected', '2fa', 'terms.accepted', 'checkout.csp'])
     ->name('subscription.expired');
 
 Route::post('/session/ping', function () {
@@ -202,7 +202,9 @@ Route::group(
     // confirma WhatsApp → painel (ver EnsurePhoneVerified para os bypasses).
     // check.subscription por último: clínica sem assinatura com acesso (trial
     // vencido, período encerrado) vai para /subscription/expired.
-    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'phone.verified', 'entity.selected', 'tenant.bind', '2fa', 'check.subscription'], 'as' => 'panel.'],
+    // terms.accepted depois do 2fa: aceite de contrato só com autenticação completa
+    // (reaceite quando sai versão nova dos Termos/Política — RequireTermsAcceptance).
+    ['prefix' => 'panel', 'middleware' => ['auth', 'verified', 'phone.verified', 'entity.selected', 'tenant.bind', '2fa', 'terms.accepted', 'check.subscription'], 'as' => 'panel.'],
     function () {
         Route::get('/', function () {
             return redirect()->route('panel.dashboard');

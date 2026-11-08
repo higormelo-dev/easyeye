@@ -23,7 +23,9 @@ class TermsService
      */
     public function accept(User $user, TermVersion $termVersion): UserTermAcceptance
     {
-        return UserTermAcceptance::firstOrCreate(
+        // createOrFirst (insere e, no índice único, lê o existente — com savepoint dentro de transação): dois POSTs
+        // simultâneos (clique duplo no aceite) não viram 500; o firstOrCreate checava antes e perdia a corrida.
+        return UserTermAcceptance::createOrFirst(
             [
                 'user_id'         => $user->id,
                 'term_version_id' => $termVersion->id,

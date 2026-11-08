@@ -48,7 +48,7 @@ it('exporta o caso do paciente com pedido, autorização e documentos, sem segre
 
     $export = app(PatientDataExporter::class)->export($this->w->patient);
 
-    expect($export['format_version'])->toBe(6)
+    expect($export['format_version'])->toBe(7)
         ->and($export['surgery'])->toHaveCount(1);
 
     $out = $export['surgery'][0];

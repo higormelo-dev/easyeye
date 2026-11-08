@@ -185,6 +185,22 @@ return [
         'placeholder'      => 'Código de 6 dígitos',
     ],
 
+    // Reaceite dos documentos legais (tela /accept-terms, gate terms.accepted do painel).
+    'terms_reaccept' => [
+        'page_title'    => 'Aceite dos termos',
+        'title'         => 'Atualizamos nossos documentos',
+        'subtitle'      => 'Leia e aceite para continuar',
+        'intro'         => 'Para continuar usando o sistema, leia e aceite a versão vigente dos documentos abaixo.',
+        'version'       => 'versão :version',
+        'open'          => 'Ler o documento',
+        'checkbox'      => 'Li e aceito os documentos acima.',
+        'submit'        => 'Aceitar e continuar',
+        'logout'        => 'Sair',
+        'required'      => 'Marque a caixa para aceitar os documentos.',
+        'changed'       => 'Os documentos foram atualizados enquanto você lia. Releia a versão nova e aceite novamente.',
+        'required_json' => 'É necessário aceitar os Termos de Uso e a Política de Privacidade para continuar.',
+    ],
+
     'panel' => [
         'feature_schedule'   => 'Agenda inteligente com confirmação automática',
         'feature_record'     => 'Prontuário oftalmológico completo e digital',

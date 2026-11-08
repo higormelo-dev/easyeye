@@ -187,6 +187,22 @@ return [
         'placeholder'      => '6-digit code',
     ],
 
+    // Re-acceptance of legal documents (/accept-terms screen, panel terms.accepted gate).
+    'terms_reaccept' => [
+        'page_title'    => 'Accept the terms',
+        'title'         => 'We updated our documents',
+        'subtitle'      => 'Read and accept to continue',
+        'intro'         => 'To keep using the system, read and accept the current version of the documents below.',
+        'version'       => 'version :version',
+        'open'          => 'Read the document',
+        'checkbox'      => 'I have read and accept the documents above.',
+        'submit'        => 'Accept and continue',
+        'logout'        => 'Sign out',
+        'required'      => 'Check the box to accept the documents.',
+        'changed'       => 'The documents were updated while you were reading. Read the new version and accept again.',
+        'required_json' => 'You must accept the Terms of Use and the Privacy Policy to continue.',
+    ],
+
     'panel' => [
         'feature_schedule'   => 'Smart scheduling with automatic confirmation',
         'feature_record'     => 'Complete digital ophthalmology records',
