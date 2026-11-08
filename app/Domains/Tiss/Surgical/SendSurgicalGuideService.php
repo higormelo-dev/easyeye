@@ -7,7 +7,7 @@ namespace App\Domains\Tiss\Surgical;
 use App\Domains\Tiss\Enums\{TissGuideStatus, TissProtocolStatus, TissTransmissionStatus, TissXmlDirection, TissXmlStatus};
 use App\Domains\Tiss\Models\{TissEntityOperatorCredential, TissGuide, TissIdempotencyKey, TissProtocol, TissTransmission, TissXmlDocument};
 use App\Domains\Tiss\Services\{LogTissStatusTransitionService, ValidateTissXmlService};
-use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, TissMessageTransportContract};
+use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, SimulatedTransportGuard, TissMessageTransportContract};
 use App\Enums\Surgery\{AuthorizationEventType, SurgicalCaseStatus};
 use App\Exceptions\Surgery\SurgeryRuleException;
 use App\Models\Surgery\SurgicalCase;
@@ -79,6 +79,11 @@ class SendSurgicalGuideService
      */
     public function send(TissGuide $guide): TissTransmission
     {
+        // Produção com transporte simulado: o mock fingiria um protocolo "Aceito" que a operadora nunca viu.
+        if (SimulatedTransportGuard::blocked()) {
+            throw SurgeryRuleException::state('surgery_tiss.errors.transport_simulated');
+        }
+
         $this->assertSendable($guide);
 
         $attempt = 0;

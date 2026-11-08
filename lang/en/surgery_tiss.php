@@ -61,6 +61,7 @@ return [
         'guide_closed'               => 'This form is cancelled or denied. Generate a new one for an appeal.',
         'guide_without_case'         => 'The form is not linked to a surgical case.',
         'item_not_found'             => 'Item does not belong to this form.',
+        'transport_simulated'        => 'Submission blocked: TISS is in simulation mode in this environment, so the form would not reach the payer. Ask support to set up the real transport.',
         'prevalidation_failed'       => 'The form has issues the insurer will reject or deny. Fix them and generate the XML again.',
         'xml_rejected'               => 'The XML was rejected by TISS 4.03.00 validation and cannot be sent.',
         'xml_changed_during_send'    => 'The form XML changed while the submission was being prepared. Nothing was sent — try again.',

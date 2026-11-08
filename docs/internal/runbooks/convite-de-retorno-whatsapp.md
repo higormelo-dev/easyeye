@@ -21,7 +21,7 @@ e, para o envio **automático** de protocolo, o *contato automático* ligado na 
 
 ## Antes de ligar a primeira clínica (uma vez)
 
-1. **Aprovar o modelo na Meta**, em **cada número que envia** (o do EasyEye e os próprios): `easyeye_lembrete_retorno`, Utilidade, pt_BR,
+1. **Aprovar o modelo na Meta**, em **cada número que envia** (o do EasyEye e os próprios). Clínica sem número próprio envia pelo do EasyEye: uma aprovação ali vale para todas elas. Clínica com número próprio precisa aprovar no dela (o aviso da tela diz qual dos dois vale para aquela clínica): `easyeye_lembrete_retorno`, Utilidade, pt_BR,
    corpo/rodapé/botões exatamente como em §6.1 da integração. Se a Meta reclassificar para *Marketing*, **parar** e decidir (tarifa e consentimento diferentes).
 2. Conferir o **webhook** do número (botões e SAIR dependem dele): Manager → WhatsApp → *Verificar app*.
 3. Escolher a clínica **piloto** (uma só, com o recepcionista treinado) e deixar o teto diário de fábrica.

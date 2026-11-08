@@ -121,6 +121,10 @@ function clearApp() {
     saveClinic({ clear_app: true });
 }
 
+// Qual número esta clínica usa: o próprio (já salvo ou digitado agora) ou, sem ele, o do EasyEye. O aviso do convite
+// de retorno diz em qual número o modelo precisa estar aprovado.
+const ownNumber = computed(() => Boolean(current.value?.has_app || form.app_id));
+
 const canTest = computed(() => Boolean(form.app_id || current.value?.has_app || props.globalHasApp));
 
 async function test(withMessage = false) {
@@ -268,7 +272,9 @@ const firstError = computed(() => {
                                     t.recall.toggle
                                 }}</label>
                             </div>
-                            <p id="mgr-wpp-recall-hint" class="text-muted mb-0 small">{{ t.recall.toggle_hint }}</p>
+                            <p id="mgr-wpp-recall-hint" class="text-muted mb-0 small" data-test="recall-hint">
+                                {{ ownNumber ? t.recall.hint_own : t.recall.hint_global }}
+                            </p>
                         </div>
                     </div>
                 </div>

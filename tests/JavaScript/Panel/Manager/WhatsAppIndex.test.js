@@ -42,7 +42,8 @@ const t = {
     close: 'Fechar',
     recall: {
         toggle: 'Convite de retorno',
-        toggle_hint: 'Libere só depois de o modelo estar aprovado na Meta.',
+        hint_global: 'Esta clínica envia pelo número do EasyEye.',
+        hint_own: 'Esta clínica envia pelo número próprio.',
         enabled: 'Convite de retorno liberado',
         badge_paused: 'Pausado',
         badge_active: 'Ativo',
@@ -700,6 +701,24 @@ describe('modal da clínica', () => {
             expect.objectContaining({ app_id: 'app-c2', confirmation_hours_before: 12, confirmation_enabled: true }),
             expect.any(Object),
         );
+    });
+
+    it('clínica com app próprio: o aviso do convite de retorno fala do número próprio', async () => {
+        wrapper = factory();
+
+        await wrapper.find('[data-test="configure-c1"]').trigger('click');
+
+        expect(wrapper.find('[data-test="recall-hint"]').text()).toBe('Esta clínica envia pelo número próprio.');
+    });
+
+    it('clínica no número do EasyEye: o aviso fala do número do EasyEye e muda ao digitar um app próprio', async () => {
+        wrapper = factory();
+
+        await wrapper.find('[data-test="configure-c2"]').trigger('click');
+        expect(wrapper.find('[data-test="recall-hint"]').text()).toBe('Esta clínica envia pelo número do EasyEye.');
+
+        await wrapper.find('[data-test="clinic-app-id"]').setValue('app-novo');
+        expect(wrapper.find('[data-test="recall-hint"]').text()).toBe('Esta clínica envia pelo número próprio.');
     });
 
     it('clínica sem configuração abre com os padrões de antes (24 h / 2 h, integração desligada)', async () => {

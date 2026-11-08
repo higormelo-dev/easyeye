@@ -61,6 +61,7 @@ return [
         'guide_closed'               => 'Esta guia está cancelada ou negada. Gere uma nova para um recurso.',
         'guide_without_case'         => 'A guia não está ligada a um caso cirúrgico.',
         'item_not_found'             => 'Item não pertence a esta guia.',
+        'transport_simulated'        => 'Envio bloqueado: o TISS está em modo simulação neste ambiente, então a guia não chegaria à operadora. Peça ao suporte para configurar o transporte real.',
         'prevalidation_failed'       => 'A guia tem pendências que a operadora vai recusar ou glosar. Corrija e gere o XML de novo.',
         'xml_rejected'               => 'O XML foi recusado na validação do TISS 4.03.00 e não pode ser enviado.',
         'xml_changed_during_send'    => 'O XML da guia mudou enquanto o envio era preparado. Nada foi enviado — tente de novo.',

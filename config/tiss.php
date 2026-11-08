@@ -23,6 +23,11 @@ return [
         'driver'      => env('TISS_TRANSPORT_DRIVER', 'mock'), // mock|http
         'environment' => env('TISS_TRANSPORT_ENVIRONMENT', 'production'), // production|sandbox
 
+        // O transporte `mock` grava protocolo "Aceito" sem enviar nada. Em PRODUÇÃO o envio fica bloqueado
+        // enquanto o driver não for `http`, para a clínica não achar que a operadora recebeu o lote. Ligar só para
+        // demonstração (TISS_ALLOW_SIMULATED_IN_PRODUCTION=true), sabendo que nada chega à operadora.
+        'allow_simulated_in_production' => (bool) env('TISS_ALLOW_SIMULATED_IN_PRODUCTION', false),
+
         'http' => [
             'timeout_seconds'         => (int) env('TISS_HTTP_TIMEOUT_SECONDS', 30),
             'connect_timeout_seconds' => (int) env('TISS_HTTP_CONNECT_TIMEOUT_SECONDS', 10),

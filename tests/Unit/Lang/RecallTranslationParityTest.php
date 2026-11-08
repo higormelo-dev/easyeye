@@ -31,7 +31,7 @@ it('lang/{pt_BR,en}/whatsapp.php: os textos do convite de retorno existem nos do
     $keys = [
         'templates.care_recall',
         'patient.recall_book', 'patient.recall_done', 'patient.recall_use_buttons',
-        'recall.toggle', 'recall.toggle_hint', 'recall.enabled', 'recall.badge_paused', 'recall.badge_active', 'recall.pause_title',
+        'recall.toggle', 'recall.hint_global', 'recall.hint_own', 'recall.enabled', 'recall.badge_paused', 'recall.badge_active', 'recall.pause_title',
         'recall.pause_text', 'recall.paused_since', 'recall.paused_reason', 'recall.impact', 'recall.pause', 'recall.resume',
         'recall.reason', 'recall.reason_hint', 'recall.confirm_pause', 'recall.confirm_resume', 'recall.paused', 'recall.resumed',
         'recall.resume_reason',

@@ -317,7 +317,8 @@ return [
     // Follow-up invitation (Phase 6): clinic switch and global pause in the Manager.
     'recall' => [
         'toggle'         => 'Follow-up invitation',
-        'toggle_hint'    => 'Enable only after the "Follow-up reminder" template is approved by Meta on this number. The clinic still has to turn on its own switch in the follow-up settings.',
+        'hint_global'    => 'This clinic sends through the EasyEye number. Enable only after the "Follow-up reminder" template is approved by Meta on that number (one approval covers every clinic that uses it). The clinic still has to turn on its own switch in the follow-up settings.',
+        'hint_own'       => 'This clinic sends through its own number. Enable only after the "Follow-up reminder" template is approved by Meta on that number. The clinic still has to turn on its own switch in the follow-up settings.',
         'enabled'        => 'Follow-up invitation enabled',
         'badge_paused'   => 'Paused',
         'badge_active'   => 'Active',

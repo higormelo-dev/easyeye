@@ -7,7 +7,7 @@ namespace App\Domains\Tiss\Services;
 use App\Domains\Tiss\Enums\{TissBatchStatus, TissGuideStatus, TissProtocolStatus, TissTransmissionStatus, TissXmlDirection, TissXmlStatus};
 use App\Domains\Tiss\Exceptions\TissBatchCancelledException;
 use App\Domains\Tiss\Models\{TissBatch, TissEntityOperatorCredential, TissIdempotencyKey, TissProtocol, TissTransmission, TissXmlDocument};
-use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, TissTransportContract};
+use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, SimulatedTransportGuard, TissTransportContract};
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\{Carbon, Str};
@@ -72,6 +72,9 @@ class SendTissBatchService
 
     public function send(TissBatch $batch, bool $force = false, bool $throwOnError = true): TissTransmission
     {
+        // Produção com transporte simulado: nada sai e nada é gravado (o mock fingiria um protocolo "Aceito").
+        SimulatedTransportGuard::assertAllowed();
+
         $attempt = 0;
 
         // Escolher o XML do lote e reivindicar a transmissão são dois passos, e

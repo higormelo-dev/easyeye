@@ -381,6 +381,14 @@ Schedule::command('queue:check-stalled')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+// Configuração de produção simulada ou desligada (captcha, TISS, WhatsApp, e-mail, IA): em 08/11/2026 estava
+// assim e ninguém era avisado. Avisa o time por e-mail, no máximo uma vez por semana por item.
+Schedule::command('ops:check-production-config')
+    ->dailyAt('08:00')
+    ->name('ops:check-production-config')
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 // Falhas de job antigas: 30 dias bastam para diagnóstico; sem isto failed_jobs cresce sem teto.
 Schedule::command('queue:prune-failed --hours=720')
     ->dailyAt('04:20')

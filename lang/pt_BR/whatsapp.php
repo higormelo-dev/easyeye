@@ -317,7 +317,8 @@ return [
     // Convite de retorno (Fase 6): chave da clínica e pausa global no Manager.
     'recall' => [
         'toggle'         => 'Convite de retorno',
-        'toggle_hint'    => 'Libere só depois de o modelo "Lembrete de retorno" estar aprovado na Meta neste número. A clínica ainda precisa ligar a própria chave nas configurações dos retornos.',
+        'hint_global'    => 'Esta clínica envia pelo número do EasyEye. Libere só depois de o modelo "Lembrete de retorno" estar aprovado na Meta nesse número (uma aprovação vale para todas as clínicas que o usam). A clínica ainda precisa ligar a própria chave nas configurações dos retornos.',
+        'hint_own'       => 'Esta clínica envia pelo número próprio. Libere só depois de o modelo "Lembrete de retorno" estar aprovado na Meta nesse número. A clínica ainda precisa ligar a própria chave nas configurações dos retornos.',
         'enabled'        => 'Convite de retorno liberado',
         'badge_paused'   => 'Pausado',
         'badge_active'   => 'Ativo',
