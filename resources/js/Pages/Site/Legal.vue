@@ -4,7 +4,7 @@
         <title>{{ title }}</title>
         <meta name="description" :content="description" />
         <link v-if="canonicalUrl" rel="canonical" :href="canonicalUrl" />
-        <!-- A Inter vem no <head> do app.blade.php; ícones: Tabler, via site.js. -->
+        <!-- Inter self-hosted no app.blade.php; ícones: Tabler, via site.js. -->
     </Head>
 
     <!-- O <main> vem do SiteLayout (alvo do "Pular para o conteúdo"). -->
@@ -13,6 +13,35 @@
             <div class="container">
                 <div class="legal-inner">
                     <h1 id="legal-title" class="section-title">{{ title }}</h1>
+
+                    <aside
+                        v-if="kind === 'privacy'"
+                        id="direitos-titular"
+                        class="legal-rights"
+                        data-test="legal-rights"
+                        aria-labelledby="legal-rights-title"
+                    >
+                        <h2 id="legal-rights-title">{{ t.legal.rights_title }}</h2>
+                        <p>{{ t.legal.rights_intro }}</p>
+                        <ul>
+                            <li>{{ t.legal.rights_access }}</li>
+                            <li>{{ t.legal.rights_correction }}</li>
+                            <li>{{ t.legal.rights_portability }}</li>
+                            <li>{{ t.legal.rights_deletion }}</li>
+                            <li>{{ t.legal.rights_opposition }}</li>
+                        </ul>
+                        <p class="legal-rights-deadline">{{ t.legal.rights_deadline }}</p>
+                        <div class="legal-rights-channel">
+                            <p class="legal-rights-label">{{ encarregadoLabel }}</p>
+                            <p v-if="contact.encarregado_name" class="legal-rights-name">
+                                {{ contact.encarregado_name }}
+                            </p>
+                            <p>
+                                <a :href="'mailto:' + contact.encarregado_email">{{ contact.encarregado_email }}</a>
+                                <span v-if="contact.encarregado_phone"> · {{ contact.encarregado_phone }} </span>
+                            </p>
+                        </div>
+                    </aside>
 
                     <template v-if="document">
                         <p class="legal-meta" data-test="legal-version">{{ versionText }}</p>
@@ -105,7 +134,18 @@ const props = defineProps({
     document: { type: Object, default: null },
     t: { type: Object, required: true },
     routes: { type: Object, required: true },
-    contact: { type: Object, default: () => ({ sales: '', support: '' }) },
+    contact: {
+        type: Object,
+        default: () => ({
+            sales: '',
+            support: '',
+            privacy: '',
+            privacy_phone: '',
+            encarregado_name: '',
+            encarregado_email: '',
+            encarregado_phone: '',
+        }),
+    },
     appName: { type: String, default: 'EasyEye' },
     canonicalUrl: { type: String, default: '' },
 });
@@ -114,6 +154,9 @@ const { tx } = useTrans(() => props.t.legal ?? {});
 
 const title = computed(() => tx(`${props.kind}_title`));
 const description = computed(() => tx(`${props.kind}_description`));
+const encarregadoLabel = computed(() =>
+    props.contact.encarregado_name ? tx('encarregado_named') : tx('encarregado_channel'),
+);
 const versionText = computed(() =>
     tx('version', {
         version: props.document?.version ?? '',

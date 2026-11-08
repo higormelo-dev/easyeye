@@ -33,6 +33,11 @@ return [
         ],
     ],
 
+    // Evidência do consentimento (patient_consents.notes).
+    'granted' => [
+        'by_guardian' => 'Autorizado pelo responsável legal: :name',
+    ],
+
     // Registro de revogação (patient_consents.revocation_reason).
     'revoked' => [
         'whatsapp_opt_out' => 'Paciente respondeu SAIR no WhatsApp',

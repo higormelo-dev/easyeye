@@ -28,6 +28,16 @@ const t = {
         original_notice: 'You are reading the original text in Portuguese.',
         read_translation: 'Back to the translation',
         original_only: 'This document is only available in Portuguese.',
+        rights_title: 'Seus direitos sobre dados pessoais',
+        rights_intro: 'Você pode exercer os direitos do art. 18:',
+        rights_access: 'Acesso',
+        rights_correction: 'Correção',
+        rights_portability: 'Portabilidade',
+        rights_deletion: 'Eliminação',
+        rights_opposition: 'Oposição',
+        rights_deadline: 'Confirmação e acesso completos: até 15 dias (art. 19, II).',
+        encarregado_named: 'Encarregado pela proteção de dados',
+        encarregado_channel: 'Canal de privacidade',
     },
 };
 
@@ -164,5 +174,55 @@ describe('Site/Legal', () => {
         mountLegal({ document: doc({ contentLang: 'pt-BR' }) });
 
         expect(wrapper.find('.legal-language').exists()).toBe(false);
+    });
+
+    describe('direitos do titular e canal (LGPD art. 18; Res. CD/ANPD nº 18/2024)', () => {
+        const privacyContact = {
+            sales: 'contato@easyeye.app',
+            support: 'suporte@easyeye.app',
+            privacy: 'privacidade@easyeye.app',
+            privacy_phone: '+55 61 0000-0000',
+        };
+
+        it('sem Encarregado designado: âncora #direitos-titular com o canal de privacidade, sem nome', () => {
+            mountLegal({
+                contact: {
+                    ...privacyContact,
+                    encarregado_name: '',
+                    encarregado_email: 'privacidade@easyeye.app',
+                    encarregado_phone: '+55 61 0000-0000',
+                },
+            });
+
+            const block = wrapper.get('aside#direitos-titular');
+            expect(block.attributes('aria-labelledby')).toBe('legal-rights-title');
+            expect(block.get('#legal-rights-title').text()).toBe('Seus direitos sobre dados pessoais');
+            expect(block.get('.legal-rights-label').text()).toBe('Canal de privacidade');
+            expect(block.find('.legal-rights-name').exists()).toBe(false);
+            expect(block.get('a').attributes('href')).toBe('mailto:privacidade@easyeye.app');
+        });
+
+        it('com Encarregado designado: mostra rótulo, nome e contato dele', () => {
+            mountLegal({
+                contact: {
+                    ...privacyContact,
+                    encarregado_name: 'Maria Encarregada',
+                    encarregado_email: 'dpo@easyeye.app',
+                    encarregado_phone: '+55 61 1111-1111',
+                },
+            });
+
+            const block = wrapper.get('aside#direitos-titular');
+            expect(block.get('.legal-rights-label').text()).toBe('Encarregado pela proteção de dados');
+            expect(block.get('.legal-rights-name').text()).toBe('Maria Encarregada');
+            expect(block.get('a').attributes('href')).toBe('mailto:dpo@easyeye.app');
+            expect(block.text()).toContain('+55 61 1111-1111');
+        });
+
+        it('só na política de privacidade: os Termos de Uso não repetem o bloco', () => {
+            mountLegal({ kind: 'terms', contact: { ...privacyContact, encarregado_name: '' } });
+
+            expect(wrapper.find('aside#direitos-titular').exists()).toBe(false);
+        });
     });
 });

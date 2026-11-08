@@ -64,6 +64,17 @@ return [
         'original_notice'    => 'Você está lendo o texto original em português, que é a versão que vale.',
         'read_translation'   => 'Voltar para a tradução',
         'original_only'      => 'Este documento está disponível apenas em português, que é a versão que vale.',
+        // Canal Art. 18 / Encarregado (Res. 18/2024) — destaque em /privacidade e /lgpd.
+        'rights_title'        => 'Seus direitos sobre dados pessoais',
+        'rights_intro'        => 'Você pode exercer, a qualquer momento, os direitos previstos no art. 18 da LGPD, entre eles:',
+        'rights_access'       => 'Confirmar a existência de tratamento e acessar seus dados',
+        'rights_correction'   => 'Corrigir dados incompletos, inexatos ou desatualizados',
+        'rights_portability'  => 'Solicitar portabilidade a outro fornecedor, quando aplicável',
+        'rights_deletion'     => 'Solicitar anonimização, bloqueio ou eliminação, nos limites legais',
+        'rights_opposition'   => 'Opor-se a tratamento em desacordo com a lei e revogar consentimento',
+        'rights_deadline'     => 'Confirmação e acesso completos: até 15 dias do pedido (LGPD art. 19, II). Pedidos sobre atendimento clínico são encaminhados à clínica controladora.',
+        'encarregado_named'   => 'Encarregado pela proteção de dados',
+        'encarregado_channel' => 'Canal de privacidade',
     ],
 
     'hero' => [

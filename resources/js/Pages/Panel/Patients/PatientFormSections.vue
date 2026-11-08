@@ -80,6 +80,20 @@ const medicineSearchUrl = computed(() => {
     }
 });
 
+/** Menor de 18 anos (LGPD art. 14) — mostra o campo opcional do responsável legal. */
+const isMinorPatient = computed(() => {
+    const birth = props.form.birth_date;
+    if (!birth || typeof birth !== 'string') return false;
+    const d = new Date(`${birth}T12:00:00`);
+    if (Number.isNaN(d.getTime())) return false;
+    const today = new Date();
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age -= 1;
+    return age < 18;
+});
+const guardianFocused = ref(false);
+
 // Textos compartilhados (lang/<locale>/ui.php → patient_form) — o mesmo
 // componente serve Pacientes e Agenda, cada um com o seu `t` de página.
 const page = usePage();
@@ -368,16 +382,24 @@ const showNoPlans = computed(
 
         <div class="row g-3 mb-3">
             <div class="col-6">
-                <label :for="fieldId('mother_name')" class="form-label">Nome da mãe</label>
+                <label :for="fieldId('mother_name')" class="form-label"
+                    >Nome da mãe <span class="text-muted fw-normal">{{ ui.optional ?? '(opcional)' }}</span></label
+                >
                 <input
                     :id="fieldId('mother_name')"
                     v-model="form.mother_name"
                     :aria-invalid="!!form.errors.mother_name"
-                    :aria-describedby="form.errors.mother_name ? fieldId('mother_name') + '-error' : undefined"
+                    :aria-describedby="
+                        form.errors.mother_name ? fieldId('mother_name') + '-error' : fieldId('mother_name') + '-hint'
+                    "
                     :class="{ 'is-invalid': form.errors.mother_name }"
                     type="text"
                     class="form-control"
+                    autocomplete="off"
                 />
+                <div :id="fieldId('mother_name') + '-hint'" class="form-text">
+                    {{ ui.parent_name_hint }}
+                </div>
                 <div
                     v-if="form.errors.mother_name"
                     :id="fieldId('mother_name') + '-error'"
@@ -387,16 +409,24 @@ const showNoPlans = computed(
                 </div>
             </div>
             <div class="col-6">
-                <label :for="fieldId('father_name')" class="form-label">Nome do pai</label>
+                <label :for="fieldId('father_name')" class="form-label"
+                    >Nome do pai <span class="text-muted fw-normal">{{ ui.optional ?? '(opcional)' }}</span></label
+                >
                 <input
                     :id="fieldId('father_name')"
                     v-model="form.father_name"
                     :aria-invalid="!!form.errors.father_name"
-                    :aria-describedby="form.errors.father_name ? fieldId('father_name') + '-error' : undefined"
+                    :aria-describedby="
+                        form.errors.father_name ? fieldId('father_name') + '-error' : fieldId('father_name') + '-hint'
+                    "
                     :class="{ 'is-invalid': form.errors.father_name }"
                     type="text"
                     class="form-control"
+                    autocomplete="off"
                 />
+                <div :id="fieldId('father_name') + '-hint'" class="form-text">
+                    {{ ui.parent_name_hint }}
+                </div>
                 <div
                     v-if="form.errors.father_name"
                     :id="fieldId('father_name') + '-error'"
@@ -404,6 +434,44 @@ const showNoPlans = computed(
                 >
                     {{ form.errors.father_name }}
                 </div>
+            </div>
+        </div>
+
+        <!-- Responsável legal (LGPD art. 14): opcional, não bloqueia o cadastro (o atendimento
+             não depende de consentimento — art. 11, II, f). Fica visível enquanto houver valor
+             salvo, para poder ser corrigido ou apagado depois que o paciente fizer 18 anos, e
+             enquanto estiver em foco (apagar o último caractere não tira o campo da tela). -->
+        <div v-if="isMinorPatient || form.legal_guardian_name || guardianFocused" class="mb-3">
+            <label :for="fieldId('legal_guardian_name')" class="form-label"
+                >{{ ui.legal_guardian ?? 'Nome do responsável legal' }}
+                <span class="text-muted fw-normal">{{ ui.optional ?? '(opcional)' }}</span></label
+            >
+            <input
+                :id="fieldId('legal_guardian_name')"
+                v-model="form.legal_guardian_name"
+                :aria-invalid="!!form.errors.legal_guardian_name"
+                :aria-describedby="
+                    form.errors.legal_guardian_name
+                        ? fieldId('legal_guardian_name') + '-error'
+                        : fieldId('legal_guardian_name') + '-hint'
+                "
+                :class="{ 'is-invalid': form.errors.legal_guardian_name }"
+                type="text"
+                class="form-control"
+                autocomplete="off"
+                data-testid="legal-guardian-name"
+                @focus="guardianFocused = true"
+                @blur="guardianFocused = false"
+            />
+            <div :id="fieldId('legal_guardian_name') + '-hint'" class="form-text">
+                {{ ui.legal_guardian_hint }}
+            </div>
+            <div
+                v-if="form.errors.legal_guardian_name"
+                :id="fieldId('legal_guardian_name') + '-error'"
+                class="invalid-feedback d-block"
+            >
+                {{ form.errors.legal_guardian_name }}
             </div>
         </div>
 
@@ -767,6 +835,7 @@ const showNoPlans = computed(
             </div>
             <div id="chkCareRemindersHint" class="form-text">
                 {{ form.whatsapp ? ui.care_reminders_hint : ui.care_reminders_needs_whatsapp }}
+                <template v-if="isMinorPatient"> {{ ui.care_reminders_minor }}</template>
             </div>
             <div
                 v-if="form.errors.care_reminders_consent"

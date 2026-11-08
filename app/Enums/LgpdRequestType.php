@@ -15,7 +15,7 @@ enum LgpdRequestType: string
     case Deletion      = 'deletion';           // Art. 18, VI  — Eliminação dos dados
     case RevokeConsent = 'revoke_consent';     // Art. 18, IX  — Revogação do consentimento
     case Information   = 'information';        // Art. 18, VII — Informação sobre compartilhamento
-    case Opposition    = 'opposition';         // Art. 18, X   — Oposição ao tratamento
+    case Opposition    = 'opposition';         // Art. 18, § 2º — Oposição ao tratamento
 
     public function label(): string
     {
@@ -27,13 +27,14 @@ enum LgpdRequestType: string
             self::Deletion      => 'Eliminação de Dados (Art. 18, VI)',
             self::RevokeConsent => 'Revogação de Consentimento (Art. 18, IX)',
             self::Information   => 'Informação sobre Compartilhamento (Art. 18, VII)',
-            self::Opposition    => 'Oposição ao Tratamento (Art. 18, X)',
+            self::Opposition    => 'Oposição ao Tratamento (Art. 18, § 2º)',
         };
     }
 
     /**
      * Prazo máximo de resposta em dias.
-     * LGPD Art. 23 — 15 dias para confirmar a existência de tratamento.
+     * LGPD Art. 19, II — 15 dias para a declaração completa de confirmação e
+     * acesso; o mesmo prazo é adotado como meta interna para os demais pedidos.
      */
     public function deadlineDays(): int
     {

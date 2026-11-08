@@ -59,7 +59,7 @@ use Illuminate\Support\Collection;
  */
 final class PatientDataExporter
 {
-    public const FORMAT_VERSION = 6; // 6: cirurgias — pedido, autorização, documentos, implante, pós-operatório (Fase 4); 5: retornos/recall e convites por WhatsApp, curso de injeções intravítreas, orientações pós-procedimento e pronto atendimento (Fase 6); 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
+    public const FORMAT_VERSION = 7; // 7: responsável legal (LGPD art. 14) no cadastro e como evidência do consentimento; 6: cirurgias — pedido, autorização, documentos, implante, pós-operatório (Fase 4); 5: retornos/recall e convites por WhatsApp, curso de injeções intravítreas, orientações pós-procedimento e pronto atendimento (Fase 6); 4: alergias, medicações em uso, retrato na consulta e uso de LC (Fase 2)
 
     /** @var array<class-string, array<string, ?string>> nomes de catálogo por id */
     private array $names = [];
@@ -129,20 +129,21 @@ final class PatientDataExporter
         }
 
         return [
-            'full_name'         => $person->full_name,
-            'nickname'          => $person->nickname,
-            'birth_date'        => $person->birth_date?->toDateString(),
-            'gender'            => $person->gender_label,
-            'marital_status'    => People::$maritalStatuses[$person->marital_status] ?? $person->marital_status,
-            'occupation'        => $person->occupation,
-            'mother_name'       => $person->mother_name,
-            'father_name'       => $person->father_name,
-            'email'             => $person->email,
-            'telephone'         => $person->telephone,
-            'cellphone'         => $person->cellphone,
-            'whatsapp'          => $person->whatsapp,
-            'national_registry' => $person->national_registry,
-            'state_registry'    => [
+            'full_name'           => $person->full_name,
+            'nickname'            => $person->nickname,
+            'birth_date'          => $person->birth_date?->toDateString(),
+            'gender'              => $person->gender_label,
+            'marital_status'      => People::$maritalStatuses[$person->marital_status] ?? $person->marital_status,
+            'occupation'          => $person->occupation,
+            'mother_name'         => $person->mother_name,
+            'father_name'         => $person->father_name,
+            'legal_guardian_name' => $person->legal_guardian_name,
+            'email'               => $person->email,
+            'telephone'           => $person->telephone,
+            'cellphone'           => $person->cellphone,
+            'whatsapp'            => $person->whatsapp,
+            'national_registry'   => $person->national_registry,
+            'state_registry'      => [
                 'number'    => $person->state_registry,
                 'agency'    => $person->state_registry_agency,
                 'state'     => $person->state_registry_initial,
@@ -923,6 +924,7 @@ final class PatientDataExporter
             'granted_at'        => $this->iso($c->granted_at),
             'revoked_at'        => $this->iso($c->revoked_at),
             'revocation_reason' => $c->revocation_reason,
+            'notes'             => $c->notes,
         ])->toArray();
     }
 

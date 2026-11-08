@@ -92,6 +92,20 @@ describe('SearchSelect — busca remota', () => {
         expect(wrapper.vm.effectiveOptions[0].label).toBe('Maria Silva');
     });
 
+    it('aceita a resposta como lista pura (ex.: panel.patients.search) além de { data: [...] }', async () => {
+        window.axios.get.mockResolvedValueOnce({
+            data: [{ id: 'p-9', full_name: 'JOAO TITULAR', code: '0009' }],
+        });
+        const wrapper = mountSelect({ labelKey: 'full_name' });
+
+        wrapper.vm.onSearchChange('joao');
+        await waitMs(350);
+        await flushPromises();
+
+        expect(wrapper.vm.effectiveOptions).toHaveLength(1);
+        expect(wrapper.vm.effectiveOptions[0]).toMatchObject({ id: 'p-9', full_name: 'JOAO TITULAR' });
+    });
+
     it('sem remoteSearchUrl mantém comportamento legado (options local)', async () => {
         const wrapper = mountSelect({
             remoteSearchUrl: '',

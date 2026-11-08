@@ -270,6 +270,7 @@ class PatientsController extends Controller
                 'email'                  => $person->email,
                 'mother_name'            => $person->mother_name,
                 'father_name'            => $person->father_name,
+                'legal_guardian_name'    => $person->legal_guardian_name,
                 'occupation'             => $person->occupation,
                 'rg'                     => $person->state_registry,
                 'rg_agency'              => $person->state_registry_agency,
@@ -331,7 +332,8 @@ class PatientsController extends Controller
         $patients = Patient::query()
             ->join('people', 'patients.person_id', '=', 'people.id')
             ->where('patients.entity_id', $entityId)
-            ->where('patients.active', true)
+            // Pedido de titular (LGPD) também vem de ex-paciente: a tela de pedidos busca os inativos.
+            ->when(! $request->boolean('include_inactive'), fn ($query) => $query->where('patients.active', true))
             ->where(function ($inner) use ($q, $qDigits) {
                 $inner->whereLikeUnaccent('people.full_name', $q)
                     ->orWhereLikeUnaccent('people.cellphone', $q)
@@ -490,6 +492,7 @@ class PatientsController extends Controller
                 'email'                  => $person->email,
                 'mother_name'            => $person->mother_name,
                 'father_name'            => $person->father_name,
+                'legal_guardian_name'    => $person->legal_guardian_name,
                 'occupation'             => $person->occupation,
                 'state_registry'         => $person->state_registry,
                 'state_registry_agency'  => $person->state_registry_agency,

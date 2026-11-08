@@ -1,5 +1,7 @@
 @use 'variables' as *;
 
+// Inter self-hosted: @font-face em resources/views/partials/font-inter.blade.php.
+
 // Reserva com as métricas da Inter (Arial ajustada): enquanto a Inter carrega,
 // o texto já ocupa quase o mesmo espaço. O system-ui é ~12% mais estreito e
 // fazia o título do hero trocar de quebra (e mover a página) na troca de fonte.

@@ -136,7 +136,8 @@ async function runRemoteSearch(term) {
         const url = props.remoteSearchUrl.replace('__Q__', encodeURIComponent(term));
         const { data } = await window.axios.get(url, { signal: req.signal });
         if (!req.current()) return;
-        const rows = Array.isArray(data?.data) ? data.data : [];
+        // `{ data: [...] }` (padrão dos endpoints de busca) ou lista pura (ex.: panel.patients.search).
+        const rows = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
         remoteOptions.value = rows.map((row) => ({
             ...row,
             [props.valueKey]: row.id ?? row[props.valueKey],

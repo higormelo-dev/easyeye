@@ -41,6 +41,7 @@ export function usePatientForm(catalogs) {
         email: '',
         mother_name: '',
         father_name: '',
+        legal_guardian_name: '',
         occupation: '',
         // Documento
         state_registry: '',
@@ -128,6 +129,7 @@ export function usePatientForm(catalogs) {
             email: '',
             mother_name: '',
             father_name: '',
+            legal_guardian_name: '',
             occupation: '',
             state_registry: '',
             state_registry_agency: '',
@@ -288,6 +290,7 @@ export function usePatientForm(catalogs) {
                 'email',
                 'mother_name',
                 'father_name',
+                'legal_guardian_name',
                 'occupation',
             ].includes(k),
         ),

@@ -2,17 +2,19 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\ConsentType;
 use App\Http\Requests\ClinicalSafety\{PatientAllergyRequest, PatientMedicationRequest};
 use App\Models\{CovenantPlan, Patient};
 use App\Rules\ActiveCovenant;
-use App\Services\PatientDuplicateFinder;
+use App\Services\{ConsentService, PatientDuplicateFinder};
 use App\Support\BrazilianFormat;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Support\Str;
+use Illuminate\Support\{Carbon, Str};
 use Illuminate\Validation\{Rule, Validator};
 use Illuminate\Validation\Rules\Unique;
+use Throwable;
 
 class PatientRequest extends FormRequest
 {
@@ -113,6 +115,14 @@ class PatientRequest extends FormRequest
                 'max:255',
             ],
             'father_name' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            // Responsável legal de paciente menor (LGPD art. 14). Opcional de
+            // propósito: o atendimento não depende de consentimento (art. 11,
+            // II, f; Enunciado CD/ANPD nº 1/2023) e a base legal é da clínica.
+            'legal_guardian_name' => [
                 'nullable',
                 'string',
                 'max:255',
@@ -282,7 +292,47 @@ class PatientRequest extends FormRequest
             if ($found['homonyms'] !== [] && ! $this->boolean('confirm_homonym')) {
                 $validator->errors()->add('confirm_homonym', __('validation.custom.patient.homonym', ['codes' => implode(', ', $found['homonyms'])]));
             }
+        }, function (Validator $validator): void {
+            $this->requireGuardianForMinorConsent($validator);
         }];
+    }
+
+    /**
+     * Autorizar os lembretes por WhatsApp (consentimento, LGPD art. 8º) de paciente menor é ato do responsável
+     * legal (art. 14, § 1º), e o registro precisa dizer quem foi (§ 5º). Só barra ESSE ato — o cadastro sem a
+     * autorização segue livre (o atendimento não depende de consentimento — art. 11, II, f).
+     */
+    private function requireGuardianForMinorConsent(Validator $validator): void
+    {
+        if ($this->input('care_reminders_consent') === null || ! $this->boolean('care_reminders_consent')
+            || $validator->errors()->has('birth_date')) {
+            return;
+        }
+
+        $current = $this->currentPatient()?->loadMissing('person');
+
+        if ($current !== null && app(ConsentService::class)->hasActiveConsent($current, ConsentType::CareReminders)) {
+            return;
+        }
+
+        $birth = $this->input('birth_date') ?? $current?->person?->birth_date;
+
+        try {
+            $minor = filled($birth) && Carbon::parse($birth)->age < 18;
+        } catch (Throwable) {
+            $minor = false;
+        }
+
+        $guardian = $this->has('legal_guardian_name')
+            ? $this->filled('legal_guardian_name')
+            : filled($current?->person?->legal_guardian_name);
+
+        if ($minor && ! $guardian) {
+            // Nos dois campos: o do responsável (onde agir) e a própria caixa — uma aba aberta antes
+            // do deploy não tem o campo do responsável e mostraria um 422 sem erro visível.
+            $validator->errors()->add('legal_guardian_name', __('validation.custom.patient.minor_consent'));
+            $validator->errors()->add('care_reminders_consent', __('validation.custom.patient.minor_consent'));
+        }
     }
 
     /**

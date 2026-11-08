@@ -30,6 +30,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
+    @include('partials.font-inter')
     @unless($isPatientPortal)
     {{-- Tema salvo pelo toggle do header (AppLayout.toggleDark grava em
          localStorage). Aplicar ANTES do theme-script/CSS: sem isso o dark

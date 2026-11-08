@@ -7,13 +7,14 @@ namespace App\Services;
 use App\Enums\{LgpdRequestStatus, LgpdRequestType};
 use App\Models\{EntityUser, LgpdRequest, Patient};
 use App\Services\Lgpd\PatientDataExporter;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Collection;
 
 class LgpdService
 {
     /**
      * Abre uma solicitação de direitos do titular.
-     * LGPD Art. 18 — prazo de resposta: 15 dias (Art. 23).
+     * LGPD Art. 18 — prazo de resposta: 15 dias (Art. 19, II; ver LgpdRequestType::deadlineDays()).
      */
     public function openRequest(
         string $entityId,
@@ -23,7 +24,15 @@ class LgpdService
         string $description,
         ?Patient $patient = null,
         ?string $requesterDocument = null,
+        ?CarbonInterface $requestedAt = null,
     ): LgpdRequest {
+        // O prazo conta do requerimento do titular (art. 19, II), não do registro:
+        // pedido recebido por e-mail e lançado dias depois guarda a data de chegada.
+        $requestedAt ??= now();
+
+        // Vence no FIM do 15º dia: no próprio dia do prazo o pedido ainda não está atrasado.
+        $deadline = $requestedAt->copy()->addDays($type->deadlineDays())->endOfDay();
+
         return LgpdRequest::create([
             'entity_id'          => $entityId,
             'patient_id'         => $patient?->id,
@@ -33,8 +42,8 @@ class LgpdService
             'request_type'       => $type,
             'status'             => LgpdRequestStatus::Pending,
             'description'        => $description,
-            'requested_at'       => now(),
-            'deadline_at'        => now()->addDays($type->deadlineDays()),
+            'requested_at'       => $requestedAt,
+            'deadline_at'        => $deadline,
         ]);
     }
 
@@ -76,7 +85,7 @@ class LgpdService
     /**
      * Conclui uma solicitação SEM revisão humana — usado no self-service do
      * Portal do Paciente (Fase 4): o titular pedindo acesso aos PRÓPRIOS
-     * dados não precisa do prazo de 15 dias do Art. 23 (esse prazo é o
+     * dados não precisa do prazo de 15 dias do Art. 19, II (esse prazo é o
      * MÁXIMO permitido pra quando há revisão humana, não um mínimo
      * obrigatório). `responded_by` fica null — nenhum EntityUser agiu.
      */

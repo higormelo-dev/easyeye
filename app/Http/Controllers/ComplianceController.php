@@ -34,6 +34,11 @@ class ComplianceController extends Controller
                 'audit'       => route('panel.reports.compliance.audit'),
                 'data_access' => route('panel.reports.compliance.access'),
             ],
+            // Atalho para os pedidos de titulares (LGPD arts. 18–19).
+            'lgpdRequests' => [
+                'url' => route('panel.reports.compliance.lgpd-requests.index'),
+                ...trans('lgpd_requests.compliance_card'),
+            ],
         ]);
     }
 

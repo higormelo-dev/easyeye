@@ -69,6 +69,11 @@ return [
         'care_reminders_needs_whatsapp' => 'Check that the mobile phone has WhatsApp to record this authorisation.',
         'care_reminders_badge'          => 'Follow-up reminders',
         'care_reminders_badge_hint'     => 'The patient authorised follow-up reminders by WhatsApp.',
+        'care_reminders_minor'          => 'Patient under 18: this authorisation must be given by the legal guardian.',
+        'legal_guardian'                => 'Legal guardian name',
+        'legal_guardian_hint'           => 'Patient under 18: who represents them. Not required for care.',
+        'optional'                      => '(optional)',
+        'parent_name_hint'              => 'Only when needed to identify the patient.',
         'occupation'                    => 'Occupation',
         'occupation_placeholder'        => 'E.g.: teacher, driver, retired',
         // Insurer plan (ANS product or clinic plan)

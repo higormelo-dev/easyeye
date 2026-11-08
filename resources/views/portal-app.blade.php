@@ -11,6 +11,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
+    @include('partials.font-inter')
     @inertiaHead
     @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/site.js'])
 </head>

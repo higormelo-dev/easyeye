@@ -118,10 +118,12 @@ class CheckoutContentSecurityPolicy
             'default-src' => ["'self'"],
             'script-src'  => ["'self'", "'unsafe-inline'", "'unsafe-eval'", ...self::SCRIPT_HOSTS, ...$devScript, ...self::assetSources()],
             // Card Payment Brick (Mercado Pago) traz CSS e fontes de *.mlstatic.com.
-            'style-src' => ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com', 'https://*.mlstatic.com', ...$devScript, ...self::assetSources()],
+            // Sem fonts.googleapis.com (G11): Inter é self-hosted; mlstatic segue
+            // no checkout Mercado Pago (ícones/CSS do Brick).
+            'style-src' => ["'self'", "'unsafe-inline'", 'https://*.mlstatic.com', ...$devScript, ...self::assetSources()],
             // Fontes de ícones (Tabler/Font Awesome) e imagens do app vêm do
             // Vite em dev e do ASSET_URL (CDN) se configurado.
-            'font-src' => ["'self'", 'data:', 'https://fonts.gstatic.com', 'https://*.mlstatic.com', ...$devScript, ...self::assetSources()],
+            'font-src' => ["'self'", 'data:', 'https://*.mlstatic.com', ...$devScript, ...self::assetSources()],
             'img-src'  => ["'self'", 'data:', 'blob:', 'https:', ...$storage, ...$devScript, ...self::assetSources()],
             // Áudio/vídeo de exames e prévias geradas no navegador.
             'media-src'   => ["'self'", 'data:', 'blob:', ...$storage, ...self::assetSources()],

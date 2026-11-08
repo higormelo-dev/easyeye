@@ -285,6 +285,7 @@ return [
         'marital_status'                              => 'estado civil',
         'mother_name'                                 => 'nome da mãe',
         'father_name'                                 => 'nome do pai',
+        'legal_guardian_name'                         => 'nome do responsável legal',
         'occupation'                                  => 'profissão',
         'contact_lens_calculation.vertex_distance_mm' => 'distância ao vértice (lente de contato)',
         'contact_lens_calculation.profile'            => 'linha de lentes (lente de contato)',
@@ -622,6 +623,7 @@ return [
         'patient' => [
             'duplicate'        => 'Já existe um paciente com este nome e esta data de nascimento nesta clínica (:codes). Abra o cadastro existente em vez de criar outro.',
             'homonym'          => 'Já existe paciente com este nome nesta clínica (:codes). Se for outra pessoa, confirme abaixo para salvar.',
+            'minor_consent'    => 'Paciente menor de idade: informe o responsável legal que autorizou os lembretes por WhatsApp (LGPD art. 14).',
             'duplicate_cpf'    => 'Já existe paciente ativo com este CPF nesta clínica (:codes) — restaure ou edite o cadastro existente.',
             'duplicate_import' => 'Duplicado: já existe paciente com o mesmo nome e data de nascimento (:codes) — linha não importada.',
             'homonym_import'   => 'Aviso: já existe paciente com o mesmo nome (:codes), com data de nascimento diferente ou não informada — importado como outra pessoa; confira se não é duplicado.',

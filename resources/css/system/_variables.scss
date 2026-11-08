@@ -594,8 +594,8 @@ $border-radius-pill: 50%;
 $border-radius: .3rem;
 $border-radius-lg: .6rem;
 
-// Font
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+// Font — Inter self-hosted: @font-face em resources/views/partials/font-inter.blade.php
+// (sem Google Fonts — LGPD arts. 33–36).
 
 
 

@@ -66,10 +66,25 @@ class PatientService
         $active   = $consents->hasActiveConsent($patient, ConsentType::CareReminders);
 
         if ($request->boolean('care_reminders_consent') && ! $active) {
-            $consents->grant($patient, ConsentType::CareReminders, $collectedBy, 'in_person', 'care_reminders_v1');
+            $consents->grant($patient, ConsentType::CareReminders, $collectedBy, 'in_person', 'care_reminders_v1', $this->guardianEvidence($patient));
         } elseif (! $request->boolean('care_reminders_consent') && $active) {
             $consents->revoke($patient, ConsentType::CareReminders, $collectedBy, (string) __('consent.revoked.patient_form', [], 'pt_BR'));
         }
+    }
+
+    /**
+     * Paciente menor: quem autorizou é o responsável legal (LGPD art. 14, § 1º), e o registro guarda o nome
+     * como evidência (§ 5º). O PatientRequest já exigiu o nome para esse ato.
+     */
+    private function guardianEvidence(Patient $patient): ?string
+    {
+        $person = $patient->person()->withTrashed()->first();
+
+        if ($person?->birth_date === null || $person->birth_date->age >= 18 || blank($person->legal_guardian_name)) {
+            return null;
+        }
+
+        return (string) __('consent.granted.by_guardian', ['name' => $person->legal_guardian_name], 'pt_BR');
     }
 
     /**
@@ -342,7 +357,7 @@ class PatientService
      */
     private function getPersonDataFromRequest(PatientRequest $request): array
     {
-        return [
+        $data = [
             'full_name'              => $request->name,
             'nickname'               => $request->nickname,
             'birth_date'             => $request->birth_date,
@@ -369,6 +384,15 @@ class PatientService
             'state'                  => $request->state,
             'country'                => $request->country,
         ];
+
+        // Campo novo (07/11/2026): só entra quando vem na requisição. Uma aba com o
+        // bundle anterior (sem o campo) não apaga o responsável gravado por outra
+        // pessoa; null explícito continua apagando.
+        if ($request->has('legal_guardian_name')) {
+            $data['legal_guardian_name'] = $request->legal_guardian_name;
+        }
+
+        return $data;
     }
 
     /**

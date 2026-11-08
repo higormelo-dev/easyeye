@@ -22,6 +22,7 @@ class ConsentService
      * @param EntityUser  $collectedBy     Profissional que coletou o consentimento
      * @param string      $channel         Canal: in_person | digital | phone
      * @param string|null $documentVersion Versão da política de privacidade vigente
+     * @param string|null $notes           Evidência do ato (ex.: responsável legal que autorizou por paciente menor — LGPD art. 14, §§ 1º e 5º)
      */
     public function grant(
         Patient $patient,
@@ -29,6 +30,7 @@ class ConsentService
         EntityUser $collectedBy,
         string $channel = 'in_person',
         ?string $documentVersion = null,
+        ?string $notes = null,
     ): PatientConsent {
         // Revoga consentimentos anteriores do mesmo tipo antes de criar um novo
         $this->revokeExisting($patient, $type, $collectedBy, 'Substituído por novo consentimento');
@@ -45,6 +47,7 @@ class ConsentService
             'granted_at'       => now(),
             'ip_address'       => request()->ip(),
             'user_agent'       => request()->userAgent(),
+            'notes'            => $notes,
         ]);
     }
 
@@ -210,8 +213,8 @@ class ConsentService
     {
         return match ($type) {
             ConsentType::DataCollection, ConsentType::ImageAndVoice, ConsentType::ResearchParticipation, ConsentType::CareReminders => LegalBasis::Consent,
-            ConsentType::SensitiveData, ConsentType::MinorGuardian => LegalBasis::HealthProtection,
-            ConsentType::DataSharing => LegalBasis::ContractExecution,
+            ConsentType::SensitiveData, ConsentType::MinorGuardian                                                                  => LegalBasis::HealthProtection,
+            ConsentType::DataSharing                                                                                                => LegalBasis::ContractExecution,
         };
     }
 }

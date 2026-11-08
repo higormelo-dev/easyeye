@@ -109,8 +109,8 @@ it('toda seção declarada como cobertura existe no arquivo exportado e a versã
         expect($export)->toHaveKey($section);
     }
 
-    expect($export['format_version'])->toBe(6)
-        ->and(PatientDataExporter::FORMAT_VERSION)->toBe(6);
+    expect($export['format_version'])->toBe(7)
+        ->and(PatientDataExporter::FORMAT_VERSION)->toBe(7);
 });
 
 it('as exclusões usam categorias que a exportação declara e as lacunas têm explicação', function () {

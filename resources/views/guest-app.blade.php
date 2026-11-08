@@ -12,6 +12,7 @@
     <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
     <link rel="apple-touch-icon" sizes="192x192" href="{{ asset('favicon-192.png') }}">
     <script>(function(){var t=localStorage.getItem('ee-guest-theme');if(t==='dark'){document.documentElement.setAttribute('data-bs-theme','dark');}})();</script>
+    @include('partials.font-inter')
     @inertiaHead
     @vite(['resources/css/vendor.css', 'resources/css/system.scss', 'resources/js/site.js'])
 </head>

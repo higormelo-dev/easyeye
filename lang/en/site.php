@@ -62,6 +62,17 @@ return [
         'original_notice'     => 'You are reading the original text in Portuguese, which is the binding version.',
         'read_translation'    => 'Back to the translation',
         'original_only'       => 'This document is only available in Portuguese, which is the binding version.',
+        // Art. 18 / DPO channel — highlighted on /privacidade and /lgpd.
+        'rights_title'        => 'Your personal data rights',
+        'rights_intro'        => 'You may exercise, at any time, the rights under LGPD Art. 18, including:',
+        'rights_access'       => 'Confirm whether we process your data and access it',
+        'rights_correction'   => 'Correct incomplete, inaccurate or outdated data',
+        'rights_portability'  => 'Request portability to another provider, when applicable',
+        'rights_deletion'     => 'Request anonymization, blocking or deletion within legal limits',
+        'rights_opposition'   => 'Object to unlawful processing and withdraw consent',
+        'rights_deadline'     => 'Full confirmation and access: within 15 days of the request (LGPD Art. 19, II). Care-related requests are routed to the controlling clinic.',
+        'encarregado_named'   => 'Data Protection Officer (Encarregado)',
+        'encarregado_channel' => 'Privacy channel',
     ],
 
     'hero' => [

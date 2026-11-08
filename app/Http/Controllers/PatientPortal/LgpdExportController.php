@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Auth;
  * Reaproveita a infraestrutura LgpdRequest/LgpdService já existente (até
  * então dormente, sem nenhum caller) só pra registro/trilha — o pedido é
  * concluído automaticamente (ver LgpdService::completeAutomatically()):
- * acesso aos PRÓPRIOS dados não precisa do prazo de 15 dias do Art. 23
+ * acesso aos PRÓPRIOS dados não precisa do prazo de 15 dias do Art. 19, II
  * (prazo é teto pra revisão humana, não piso obrigatório).
  */
 class LgpdExportController extends Controller

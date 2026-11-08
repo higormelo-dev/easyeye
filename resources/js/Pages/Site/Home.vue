@@ -48,7 +48,7 @@
             v-text="JSON.stringify(schema)"
         />
 
-        <!-- Imagem do hero (LCP). A Inter vem no <head> do app.blade.php (HTML inicial);
+        <!-- Imagem do hero (LCP). Inter self-hosted no app.blade.php (HTML inicial);
              ícones: Tabler, via site.js. -->
         <link v-if="heroSrc" rel="preload" as="image" type="image/webp" :href="heroSrc" />
     </Head>

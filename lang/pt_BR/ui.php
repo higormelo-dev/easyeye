@@ -69,6 +69,11 @@ return [
         'care_reminders_needs_whatsapp' => 'Marque que o celular tem WhatsApp para registrar esta autorização.',
         'care_reminders_badge'          => 'Lembretes de retorno',
         'care_reminders_badge_hint'     => 'O paciente autorizou lembretes de retorno por WhatsApp.',
+        'care_reminders_minor'          => 'Paciente menor de idade: esta autorização deve ser dada pelo responsável legal.',
+        'legal_guardian'                => 'Nome do responsável legal',
+        'legal_guardian_hint'           => 'Paciente menor de idade: quem o representa. Não é exigido para o atendimento.',
+        'optional'                      => '(opcional)',
+        'parent_name_hint'              => 'Só quando necessário para identificação do paciente.',
         'occupation'                    => 'Profissão',
         'occupation_placeholder'        => 'Ex.: professora, motorista, aposentado(a)',
         // Plano do convênio (produto da ANS ou plano da clínica)

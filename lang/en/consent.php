@@ -33,6 +33,11 @@ return [
         ],
     ],
 
+    // Consent evidence (patient_consents.notes).
+    'granted' => [
+        'by_guardian' => 'Authorised by the legal guardian: :name',
+    ],
+
     // Revocation record (patient_consents.revocation_reason).
     'revoked' => [
         'whatsapp_opt_out' => 'Patient replied STOP on WhatsApp',

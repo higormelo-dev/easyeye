@@ -364,6 +364,8 @@ class PanelNavigation
                 ['route' => 'panel.accesscontrol.users.index', 'label' => __('actions.users'), 'match' => ['panel.accesscontrol.users.*']],
                 ['route' => 'panel.accesscontrol.roles.index', 'label' => __('actions.sidemenu.roles'), 'match' => ['panel.accesscontrol.roles.*']],
                 ['route' => 'panel.setting.security.index', 'label' => __('manager_hardening.entity_2fa_section'), 'match' => ['panel.setting.security.*']],
+                // Privacidade (LGPD arts. 18–19): pedidos de titulares; a página de Compliance (trilhas) fica no mesmo match.
+                ['route' => 'panel.reports.compliance.lgpd-requests.index', 'label' => __('lgpd_requests.page_title'), 'match' => ['panel.reports.compliance', 'panel.reports.compliance.*']],
             ];
 
             // Documentos: modelos de documentação clínica (receituários,

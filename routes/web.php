@@ -41,6 +41,7 @@ use App\Http\Controllers\{
     Financial\ProcedurePricesController,
     Financial\TissGlosasController,
     Financial\TissGuidePreValidateController,
+    LgpdRequestsController,
     LocaleController,
     MyPayoutsController,
     NoticesController,
@@ -120,6 +121,8 @@ Route::get('/', [SiteController::class, 'index'])->name('site.home');
 // aparecem sozinhas quando ganharem rota nomeada (ver App\Support\Site\SiteLinks).
 Route::get('/privacidade', [SiteLegalController::class, 'privacy'])->name('site.privacy');
 Route::get('/termos', [SiteLegalController::class, 'terms'])->name('site.terms');
+// Canal LGPD / direitos do titular (Art. 18): mesma página de privacidade, âncora em destaque.
+Route::redirect('/lgpd', '/privacidade#direitos-titular')->name('site.lgpd');
 Route::post('/contato', [SiteController::class, 'contactStore'])->middleware('throttle:5,1')->name('contact.store');
 
 // SEO: Sitemap XML dinâmico
@@ -1138,6 +1141,17 @@ Route::group(
             Route::get('reports/compliance', [ComplianceController::class, 'index'])->name('reports.compliance');
             Route::get('reports/compliance/audit', [ComplianceController::class, 'exportAuditLogs'])->name('reports.compliance.audit');
             Route::get('reports/compliance/access', [ComplianceController::class, 'exportDataAccessLogs'])->name('reports.compliance.access');
+            // Pedidos de titulares (LGPD arts. 18–19): registro, prazo, resposta e exportação dos dados do paciente.
+            Route::get('reports/compliance/lgpd-requests', [LgpdRequestsController::class, 'index'])->name('reports.compliance.lgpd-requests.index');
+            Route::post('reports/compliance/lgpd-requests', [LgpdRequestsController::class, 'store'])
+                ->middleware('throttle:30,1')
+                ->name('reports.compliance.lgpd-requests.store');
+            Route::patch('reports/compliance/lgpd-requests/{lgpdRequest}', [LgpdRequestsController::class, 'update'])
+                ->middleware('throttle:60,1')
+                ->name('reports.compliance.lgpd-requests.update');
+            Route::get('reports/compliance/lgpd-requests/{lgpdRequest}/export', [LgpdRequestsController::class, 'export'])
+                ->middleware('throttle:6,1')
+                ->name('reports.compliance.lgpd-requests.export');
 
             Route::group(['prefix' => 'accesscontrol', 'as' => 'accesscontrol.'], function () {
                 // Tabela e cards usam o mesmo paginator do index (o antigo

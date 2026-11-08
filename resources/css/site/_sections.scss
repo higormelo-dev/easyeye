@@ -1904,6 +1904,70 @@ select.cf-control {
     margin-bottom: 28px;
 }
 
+// Canal Art. 18 / Encarregado — destaque acima do documento (G1/G13).
+.legal-rights {
+    margin-bottom: 32px;
+    padding: 24px 28px;
+    border-radius: $radius-lg;
+    border: 1px solid rgba($teal, .35);
+    background: rgba($teal, .06);
+    scroll-margin-top: 112px;
+
+    h2 {
+        @include type-title-sm;
+        color: $navy;
+        margin-bottom: 10px;
+    }
+
+    p {
+        @include type-body;
+        color: $text;
+        margin: 0;
+    }
+
+    ul {
+        margin: 12px 0 0;
+        padding-left: 22px;
+    }
+
+    li {
+        @include type-meta;
+        color: $text;
+    }
+
+    li + li { margin-top: 6px; }
+}
+
+.legal-rights-deadline {
+    margin-top: 14px !important;
+    @include type-meta;
+    color: $text-muted;
+}
+
+.legal-rights-channel {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba($teal, .25);
+
+    a {
+        color: $teal-ink;
+        font-weight: 600;
+        text-underline-offset: 3px;
+    }
+}
+
+.legal-rights-label {
+    @include type-meta;
+    font-weight: 700;
+    color: $navy;
+    margin-bottom: 4px !important;
+}
+
+.legal-rights-name {
+    font-weight: 600;
+    margin-bottom: 4px !important;
+}
+
 .legal-index {
     margin-bottom: 32px;
 

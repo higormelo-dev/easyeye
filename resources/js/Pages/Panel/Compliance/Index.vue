@@ -1,11 +1,14 @@
 <script setup>
 import { ref } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import PageHeader from '@/Components/Panel/PageHeader.vue';
 
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
     exports: { type: Object, required: true },
+    // Atalho para os pedidos de titulares (LGPD arts. 18–19): { url, title, text, link }.
+    lgpdRequests: { type: Object, default: null },
 });
 
 const auditForm = ref({ date_from: '', date_until: '' });
@@ -22,6 +25,19 @@ function buildUrl(base, params) {
     <AppLayout title="Compliance & Auditoria" :breadcrumbs="breadcrumbs">
         <div class="container-fluid py-3">
             <PageHeader title="Compliance & Auditoria" subtitle="LGPD/CFM — exporte trilhas de auditoria do período" />
+
+            <div v-if="lgpdRequests" class="card mb-3" data-test="compliance-lgpd-requests">
+                <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <div>
+                        <h2 class="h6 mb-1 fw-semibold">
+                            <i class="ti ti-user-shield me-1 text-primary" aria-hidden="true"></i
+                            >{{ lgpdRequests.title }}
+                        </h2>
+                        <p class="small text-muted mb-0">{{ lgpdRequests.text }}</p>
+                    </div>
+                    <Link :href="lgpdRequests.url" class="btn btn-outline-primary">{{ lgpdRequests.link }}</Link>
+                </div>
+            </div>
 
             <div class="row g-3">
                 <!-- Audit -->

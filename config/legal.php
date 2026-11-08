@@ -9,4 +9,12 @@ return [
     'privacy_phone'      => env('LEGAL_PRIVACY_PHONE', '+55 61 98467-6485'),
     'terms_email'        => env('LEGAL_TERMS_EMAIL', 'contato@easyeye.app'),
     'terms_phone'        => env('LEGAL_TERMS_PHONE', '+55 61 98467-6485'),
+
+    // Encarregado (LGPD art. 41; Res. CD/ANPD nº 18/2024): pessoa natural ou
+    // jurídica designada por ato formal (.lgpd/encarregado.md). Sem nome, o site
+    // mostra só o canal de privacidade — nunca a própria controladora como se
+    // fosse o Encarregado. E-mail/telefone vazios caem no canal de privacidade.
+    'encarregado_name'  => env('LEGAL_ENCARREGADO_NAME'),
+    'encarregado_email' => env('LEGAL_ENCARREGADO_EMAIL'),
+    'encarregado_phone' => env('LEGAL_ENCARREGADO_PHONE'),
 ];

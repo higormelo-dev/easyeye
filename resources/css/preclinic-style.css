@@ -5,7 +5,7 @@ Version: 1.0.0
 Author: Dreams Technologies
 Author URL: https://themeforest.net/user/dreamstechnologies
 */
-@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+/* Inter self-hosted — ver resources/css/system/_variables.scss (G11 LGPD). */
 :root {
   --sidenav-width: 276px;
   --sidenav-width-sm: 70px;

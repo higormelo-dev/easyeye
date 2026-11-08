@@ -285,6 +285,7 @@ return [
         'marital_status'                              => 'marital status',
         'mother_name'                                 => 'mother name',
         'father_name'                                 => 'father name',
+        'legal_guardian_name'                         => 'legal guardian name',
         'occupation'                                  => 'occupation',
         'contact_lens_calculation.vertex_distance_mm' => 'vertex distance (contact lens)',
         'contact_lens_calculation.profile'            => 'lens range (contact lens)',
@@ -613,6 +614,7 @@ return [
         'patient' => [
             'duplicate'        => 'There is already a patient with this name and date of birth in this clinic (:codes). Open the existing record instead of creating another one.',
             'homonym'          => 'There is already a patient with this name in this clinic (:codes). If this is a different person, confirm below to save.',
+            'minor_consent'    => 'Patient under 18: enter the legal guardian who authorised the WhatsApp reminders (LGPD Art. 14).',
             'duplicate_cpf'    => 'There is already an active patient with this CPF in this clinic (:codes) — use the existing record instead.',
             'duplicate_import' => 'Duplicate: there is already a patient with the same name and date of birth (:codes) — row not imported.',
             'homonym_import'   => 'Warning: there is already a patient with the same name (:codes) and a different or missing date of birth — imported as a different person; check it is not a duplicate.',

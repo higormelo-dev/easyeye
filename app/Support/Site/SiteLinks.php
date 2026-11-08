@@ -50,13 +50,31 @@ final class SiteLinks
     }
 
     /**
-     * @return array{sales: string, support: string}
+     * @return array{
+     *     sales: string,
+     *     support: string,
+     *     privacy: string,
+     *     privacy_phone: string,
+     *     encarregado_name: string,
+     *     encarregado_email: string,
+     *     encarregado_phone: string,
+     * }
      */
     public static function contact(): array
     {
+        $privacyEmail     = (string) config('legal.privacy_email');
+        $privacyPhone     = (string) config('legal.privacy_phone');
+        $encarregadoEmail = (string) (config('legal.encarregado_email') ?: $privacyEmail);
+        $encarregadoPhone = (string) (config('legal.encarregado_phone') ?: $privacyPhone);
+
         return [
-            'sales'   => (string) config('mail.contact_address'),
-            'support' => (string) config('mail.support_address'),
+            'sales'             => (string) config('mail.contact_address'),
+            'support'           => (string) config('mail.support_address'),
+            'privacy'           => $privacyEmail,
+            'privacy_phone'     => $privacyPhone,
+            'encarregado_name'  => (string) config('legal.encarregado_name', ''),
+            'encarregado_email' => $encarregadoEmail,
+            'encarregado_phone' => $encarregadoPhone,
         ];
     }
 }

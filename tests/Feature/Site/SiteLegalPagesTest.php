@@ -68,6 +68,52 @@ describe('páginas /privacidade e /termos', function (): void {
                 ->where('contact.support', 'suporte@exemplo.test'));
     });
 
+    it('a página de privacidade expõe o canal de direitos do titular e o contato do encarregado', function (): void {
+        config([
+            'legal.encarregado_name'  => 'Maria Encarregada',
+            'legal.encarregado_email' => 'dpo@exemplo.test',
+            'legal.encarregado_phone' => '+55 11 9999-0000',
+            'legal.privacy_email'     => 'privacidade@exemplo.test',
+        ]);
+        siteLegalTerm('privacy_policy', '1.0');
+
+        $this->get('/privacidade')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Site/Legal')
+                ->where('kind', 'privacy')
+                ->where('contact.encarregado_name', 'Maria Encarregada')
+                ->where('contact.encarregado_email', 'dpo@exemplo.test')
+                ->where('contact.encarregado_phone', '+55 11 9999-0000')
+                ->has('t.legal.rights_title')
+                ->has('t.legal.encarregado_named'));
+    });
+
+    it('sem Encarregado designado, a página mostra só o canal de privacidade e não usa a controladora como Encarregado', function (): void {
+        config([
+            'legal.encarregado_name'  => null,
+            'legal.encarregado_email' => null,
+            'legal.encarregado_phone' => null,
+            'legal.privacy_email'     => 'privacidade@exemplo.test',
+            'legal.privacy_phone'     => '+55 11 3333-0000',
+            'legal.controller_name'   => 'CONTROLADORA EXEMPLO LTDA',
+        ]);
+        siteLegalTerm('privacy_policy', '1.0');
+
+        $this->get('/privacidade')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('contact.encarregado_name', '')
+                ->where('contact.encarregado_email', 'privacidade@exemplo.test')
+                ->where('contact.encarregado_phone', '+55 11 3333-0000')
+                ->where('t.legal.encarregado_channel', trans('site.legal.encarregado_channel')));
+    });
+
+    it('/lgpd redireciona para o canal de direitos em /privacidade', function (): void {
+        $this->get('/lgpd')
+            ->assertRedirect('/privacidade#direitos-titular');
+    });
+
     it('o link de Política de Privacidade do consentimento do formulário leva a uma página que existe', function (): void {
         preg_match('/href="([^"]+)"/', (string) trans('site.contact.form.terms'), $match);
 
@@ -92,7 +138,7 @@ describe('links do rodapé e contatos na Home', function (): void {
                 ->where('routes.blog', null)
                 ->where('routes.partners', null)
                 ->where('routes.careers', null)
-                ->where('routes.lgpd', null)
+                ->where('routes.lgpd', route('site.lgpd'))
                 ->where('routes.contactStore', route('contact.store')));
     });
 
