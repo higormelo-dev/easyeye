@@ -273,12 +273,14 @@ class PanelNavigation
                 'key'      => 'financial',
                 'icon'     => 'ti ti-cash-register',
                 'label'    => __('actions.sidemenu.financial'),
-                'match'    => ['panel.financial.*'],
+                'match'    => ['panel.financial.*', 'panel.setting.tiss-credentials.*'],
                 'children' => [
                     ['route' => 'panel.financial.bi.index', 'icon' => 'ti ti-layout-dashboard', 'label' => __('actions.sidemenu.management_dashboard'), 'match' => ['panel.financial.bi.*']],
                     ['route' => 'panel.financial.cash-flow.index', 'icon' => 'ti ti-building-bank', 'label' => __('actions.sidemenu.cash_flow'), 'match' => ['panel.financial.cash-flow.*']],
                     ['route' => 'panel.financial.cash-closing.index', 'icon' => 'ti ti-lock', 'label' => __('actions.sidemenu.cash_closing'), 'match' => ['panel.financial.cash-closing.*']],
                     ['route' => 'panel.financial.billing.index', 'icon' => 'ti ti-file-invoice', 'label' => __('actions.sidemenu.tiss_billing'), 'match' => ['panel.financial.billing.*']],
+                    // Credenciais do webservice das operadoras: só o administrador (rota entity.role:admin).
+                    ...($isAdmin ? [['route' => 'panel.setting.tiss-credentials.index', 'icon' => 'ti ti-key', 'label' => __('actions.sidemenu.tiss_credentials'), 'match' => ['panel.setting.tiss-credentials.*']]] : []),
                     ['route' => 'panel.financial.doctor-payouts.index', 'icon' => 'ti ti-stethoscope', 'label' => __('actions.sidemenu.doctor_payouts'), 'match' => ['panel.financial.doctor-payouts.*']],
                     ['route' => 'panel.financial.procedure-prices.index', 'icon' => 'ti ti-tags', 'label' => __('actions.sidemenu.procedure_prices'), 'match' => ['panel.financial.procedure-prices.*']],
                     ['route' => 'panel.financial.tiss.glosas.index', 'icon' => 'ti ti-gavel', 'label' => __('actions.sidemenu.tiss_glosas'), 'match' => ['panel.financial.tiss.glosas.*']],

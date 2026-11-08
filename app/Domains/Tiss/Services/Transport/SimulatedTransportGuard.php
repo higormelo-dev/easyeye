@@ -13,10 +13,16 @@ use App\Domains\Tiss\Exceptions\TissSimulatedTransportException;
  */
 final class SimulatedTransportGuard
 {
+    /** Transporte de teste (não chega à operadora) em qualquer ambiente: as telas avisam que o resultado é simulado. */
+    public static function simulated(): bool
+    {
+        return config('tiss.transport.driver') !== 'http';
+    }
+
     public static function blocked(): bool
     {
         return app()->isProduction()
-            && config('tiss.transport.driver') !== 'http'
+            && self::simulated()
             && ! config('tiss.transport.allow_simulated_in_production');
     }
 

@@ -423,6 +423,7 @@ return [
         'batch_created'         => 'Batch :code created with :included claim(s).',
         'batch_created_detail'  => 'Batch :code created with :included claim(s); :pending pending claim(s) were left out of the batch (see the Claims tab).',
         'batch_submitted'       => 'Batch :code sent to the insurer.',
+        'batch_simulated'       => 'Batch :code processed in simulation mode: nothing was sent to the insurer. The generated protocol (SIMULADO-…) is a test one and is not an acceptance.',
         'batch_charged'         => 'Batch :code marked as charged.',
         'claim_paid'            => 'Payment recorded on claim :code.',
         'claim_denied'          => 'Claim :code marked as denied.',

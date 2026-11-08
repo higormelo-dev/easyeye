@@ -31,6 +31,10 @@ return [
         'http' => [
             'timeout_seconds'         => (int) env('TISS_HTTP_TIMEOUT_SECONDS', 30),
             'connect_timeout_seconds' => (int) env('TISS_HTTP_CONNECT_TIMEOUT_SECONDS', 10),
+
+            // O endereço do webservice vem do administrador da clínica: por padrão só IP público (TissEndpointGuard).
+            // `true` libera a rede interna (simulador de operadora na máquina, testes). Em produção é ignorado.
+            'allow_private_endpoints' => (bool) env('TISS_ALLOW_PRIVATE_ENDPOINTS', false),
         ],
 
         // Prazo (s) em que uma transmissão 'sending' é considerada EM VOO de

@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Tiss\Services\Transport;
 
+use App\Domains\Tiss\Exceptions\{TissCredentialIncompleteException, TissEndpointNotAllowedException};
 use App\Domains\Tiss\Models\TissEntityOperatorCredential;
-use Illuminate\Support\Facades\{Crypt, Http};
 use Throwable;
 
 class HttpTissTransportClient implements TissMessageTransportContract, TissTransportContract
 {
+    /** Recusado antes de conectar (destino ou certificado): nada saiu, então não conta como entrega em dúvida. */
+    public const NOT_SENT = 'not_sent';
+
     /**
      * @param array<string, mixed> $context
      *
@@ -54,8 +57,7 @@ class HttpTissTransportClient implements TissMessageTransportContract, TissTrans
      */
     private function post(TissEntityOperatorCredential $credential, string $xml, string $idempotencyKey, array $extraHeaders): array
     {
-        $endpoint = $credential->endpoint_submission
-            ?: ($credential->operator?->webservice_base_url ? rtrim((string) $credential->operator->webservice_base_url, '/') . '/tiss' : null);
+        $endpoint = $credential->submissionEndpoint();
 
         if (! $endpoint) {
             return [
@@ -72,13 +74,28 @@ class HttpTissTransportClient implements TissMessageTransportContract, TissTrans
 
         $timeout        = (int) config('tiss.transport.http.timeout_seconds', 30);
         $connectTimeout = (int) config('tiss.transport.http.connect_timeout_seconds', 10);
-        $verifySsl      = (bool) $credential->ssl_enabled;
+
+        try {
+            // Autenticação, TLS, certificado do cliente e trava de destino: os mesmos do teste de conexão da tela.
+            $client = TissHttpClientFactory::make($credential, $endpoint, $timeout, $connectTimeout);
+        } catch (TissEndpointNotAllowedException|TissCredentialIncompleteException $exception) {
+            // Recusado aqui, antes de qualquer conexão: a operadora com certeza não recebeu nada (não é dúvida).
+            return [
+                'ok'               => false,
+                'status_code'      => null,
+                'response_body'    => null,
+                'protocol_number'  => null,
+                'protocol_status'  => null,
+                'error_code'       => self::NOT_SENT,
+                'error_message'    => $exception->getMessage(),
+                'response_time_ms' => null,
+            ];
+        }
 
         $startedAt = microtime(true);
 
         try {
-            $request = Http::timeout($timeout)
-                ->connectTimeout($connectTimeout)
+            $request = $client
                 ->accept('application/xml')
                 ->contentType('application/xml; charset=UTF-8')
                 ->withHeaders([
@@ -86,21 +103,7 @@ class HttpTissTransportClient implements TissMessageTransportContract, TissTrans
                     'X-Entity-Id'        => (string) $credential->entity_id,
                     'X-Tiss-Environment' => (string) $credential->environment,
                     ...$extraHeaders,
-                ])
-                ->withOptions([
-                    'verify' => $verifySsl,
                 ]);
-
-            if ($credential->username && $credential->password_encrypted) {
-                $request = $request->withBasicAuth(
-                    (string) $credential->username,
-                    $this->decryptValue((string) $credential->password_encrypted),
-                );
-            }
-
-            if ($credential->token_encrypted) {
-                $request = $request->withToken($this->decryptValue((string) $credential->token_encrypted));
-            }
 
             $response     = $request->send('POST', $endpoint, ['body' => $xml]);
             $responseBody = (string) $response->body();
@@ -117,25 +120,16 @@ class HttpTissTransportClient implements TissMessageTransportContract, TissTrans
             ];
         } catch (Throwable $exception) {
             return [
-                'ok'               => false,
-                'status_code'      => null,
-                'response_body'    => null,
-                'protocol_number'  => null,
-                'protocol_status'  => null,
-                'error_code'       => 'transport_exception',
-                'error_message'    => $exception->getMessage(),
+                'ok'              => false,
+                'status_code'     => null,
+                'response_body'   => null,
+                'protocol_number' => null,
+                'protocol_status' => null,
+                'error_code'      => 'transport_exception',
+                // A mensagem do cURL/Guzzle pode trazer o caminho absoluto do certificado no servidor.
+                'error_message'    => str_replace(storage_path(), '[storage]', $exception->getMessage()),
                 'response_time_ms' => (int) ((microtime(true) - $startedAt) * 1000),
             ];
-        }
-    }
-
-    private function decryptValue(string $value): string
-    {
-        try {
-            return Crypt::decryptString($value);
-        } catch (Throwable) {
-            // Compatibilidade com bases antigas que podem armazenar em texto puro.
-            return $value;
         }
     }
 

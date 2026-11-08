@@ -6,7 +6,7 @@ namespace App\Domains\Tiss\Jobs;
 
 use App\Domains\Tiss\Actions\RecordTissBatchFailureAction;
 use App\Domains\Tiss\Enums\TissBatchStatus;
-use App\Domains\Tiss\Exceptions\{TissBatchCancelledException, TissSimulatedTransportException};
+use App\Domains\Tiss\Exceptions\{TissBatchCancelledException, TissCredentialIncompleteException, TissSimulatedTransportException};
 use App\Domains\Tiss\Models\TissBatch;
 use App\Domains\Tiss\Services\SendTissBatchService;
 use Illuminate\Bus\Queueable;
@@ -70,9 +70,9 @@ class SendTissBatchJob implements ShouldQueue, ShouldBeUnique
             );
         } catch (TissBatchCancelledException) {
             return;
-        } catch (TissSimulatedTransportException $e) {
-            // Transporte simulado em produção é configuração: tentar de novo (5x, 2 min) não resolve. Falha já, e
-            // failed() leva o lote a "erro" com o motivo, para o reenvio depois de configurar o transporte real.
+        } catch (TissSimulatedTransportException|TissCredentialIncompleteException $e) {
+            // Transporte simulado em produção ou credencial incompleta é configuração: tentar de novo (5x, 2 min) não
+            // resolve. Falha já, e failed() leva o lote a "erro" com o motivo, para o reenvio depois de configurar.
             $this->fail($e);
         }
     }

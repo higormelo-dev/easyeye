@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Surgery;
 
 use App\Domains\Tiss\Enums\TissGuideType;
 use App\Domains\Tiss\Models\TissGuide;
+use App\Domains\Tiss\Services\Transport\MockTissTransportClient;
 use App\Domains\Tiss\Surgical\{SendSurgicalGuideService, SurgicalAuthorizationResponseService, SurgicalGuidePdfService, SurgicalGuideService, SurgicalMessageXmlService};
 use App\Enums\DataAccessPurpose;
 use App\Exceptions\Surgery\SurgeryRuleException;
@@ -117,8 +118,10 @@ class SurgeryTissController extends Controller
         $this->authorizeManage();
 
         $transmission = $this->sender->send($this->guide($surgicalCase, $guide));
+        $protocol     = $transmission->protocol?->protocol_number;
 
-        return back()->with('success', __('surgery_tiss.messages.sent', ['protocol' => $transmission->protocol?->protocol_number ?? '—']));
+        // Transporte de teste: protocolo SIMULADO-…, a operadora não recebeu nada.
+        return back()->with('success', __(MockTissTransportClient::isSimulatedProtocol($protocol) ? 'surgery_tiss.messages.sent_simulated' : 'surgery_tiss.messages.sent', ['protocol' => $protocol ?? '—']));
     }
 
     public function reopen(SurgicalCase $surgicalCase, string $guide): RedirectResponse

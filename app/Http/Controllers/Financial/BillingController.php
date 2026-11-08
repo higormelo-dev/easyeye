@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Financial;
 
 use App\Domains\Tiss\Models\{TissGlosaReason, TissTussCode};
 use App\Domains\Tiss\Services\TissWorkflowService;
+use App\Domains\Tiss\Services\Transport\SimulatedTransportGuard;
 use App\Enums\{BillingBatchStatus, BillingClaimStatus, EntityGate, PaymentMethod};
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Financial\Concerns\PresentsTissValidation;
@@ -646,9 +647,14 @@ class BillingController extends Controller
 
         $batch = $this->billingService->submitBatch($batch);
 
-        return back()->with('success', $this->billingService->isParticularBatch($batch)
-            ? __('financial_billing.flash.batch_charged', ['code' => $batch->code])
-            : __('financial_billing.flash.batch_submitted', ['code' => $batch->code]));
+        // Transporte de teste: o protocolo gravado é SIMULADO-…, não um aceite da operadora.
+        $key = match (true) {
+            $this->billingService->isParticularBatch($batch)                      => 'batch_charged',
+            filled($batch->tiss_batch_id) && SimulatedTransportGuard::simulated() => 'batch_simulated',
+            default                                                               => 'batch_submitted',
+        };
+
+        return back()->with('success', __('financial_billing.flash.' . $key, ['code' => $batch->code]));
     }
 
     public function exportBatchXml(BillingBatch $batch)

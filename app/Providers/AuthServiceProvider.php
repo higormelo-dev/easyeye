@@ -367,6 +367,10 @@ class AuthServiceProvider extends ServiceProvider
             return $user->hasRoleInEntity($entity, ClientRule::Admin);
         });
 
+        // Credenciais TISS: só o admin da clínica cliente (ver EntityGate::ManageTissCredentials).
+        Gate::define(EntityGate::ManageTissCredentials->value, fn (User $user, Entity $entity): bool => $entity->isClient()
+            && $user->hasRoleInEntity($entity, ClientRule::Admin));
+
         /**
          * Gerenciar configurações de SEGURANÇA da entity (2FA obrigatório,
          * futuras políticas de senha/sessão).

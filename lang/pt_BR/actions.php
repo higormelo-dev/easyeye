@@ -284,6 +284,7 @@ return [
         'financial'             => 'Financeiro',
         'cash_flow'             => 'Fluxo de caixa',
         'tiss_billing'          => 'Faturamento TISS',
+        'tiss_credentials'      => 'Credenciais TISS',
         'financial_reports'     => 'Relatórios financeiros',
         'cash_closing'          => 'Fechamento de caixa',
         'doctor_payouts'        => 'Repasse médico',

@@ -129,4 +129,11 @@ enum EntityGate: string
      * SaaS (que é onde o admin gerencia 2FA dos próprios admins SaaS).
      */
     case ManageSecuritySettings = 'entity.manage-security-settings';
+
+    /**
+     * Credenciais TISS da clínica por operadora e ambiente (Configurações > Credenciais TISS): usuário, senha,
+     * token e certificado do webservice. Só o ADMIN da clínica cliente — nem financeiro, nem papel customizado,
+     * nem admin SaaS fora de impersonação (a credencial é da clínica).
+     */
+    case ManageTissCredentials = 'entity.manage-tiss-credentials';
 }

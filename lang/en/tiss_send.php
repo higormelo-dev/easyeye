@@ -21,6 +21,8 @@ return [
 
     'simulated_blocked' => 'Submission blocked: TISS is in simulation mode in this environment (TISS_TRANSPORT_DRIVER is not http), so the batch would not reach the payer. Ask support to set up the real transport, then resubmit the batch.',
 
+    'credential_incomplete' => 'Submission blocked: the TISS credential for :operator (:environment) is incomplete. Missing: :missing. A clinic administrator completes it in Financial > TISS credentials; then resubmit.',
+
     'forced_resend_failed' => 'The resubmission failed (:reason). The payer\'s confirmation was preserved: the batch is still marked as sent and nothing in it was changed.',
 
     'delivery_still_unknown' => 'This attempt failed (:reason), but the previous submission got no response and is still in doubt: we cannot tell whether the payer received the batch, and this failure does not prove it did not. The batch stays locked for changes until the payer confirms receipt: fix the cause (for example, the credentials or the service address) and submit again — the same XML and idempotency key are reused, which prevents the payer from receiving the batch twice.',

@@ -423,6 +423,7 @@ return [
         'batch_created'         => 'Lote :code criado com :included guia(s).',
         'batch_created_detail'  => 'Lote :code criado com :included guia(s); :pending com pendência ficaram fora do lote (veja a aba Guias).',
         'batch_submitted'       => 'Lote :code enviado à operadora.',
+        'batch_simulated'       => 'Lote :code processado em modo simulação: nada foi enviado à operadora. O protocolo gerado (SIMULADO-…) é de teste e não vale como aceite.',
         'batch_charged'         => 'Lote :code marcado como cobrado.',
         'claim_paid'            => 'Recebimento registrado na guia :code.',
         'claim_denied'          => 'Guia :code marcada como glosada.',

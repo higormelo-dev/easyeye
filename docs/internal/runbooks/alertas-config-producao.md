@@ -16,7 +16,7 @@ Origem: levantamento do servidor de 08/11/2026. Captcha do cadastro, transporte 
 | Código | Quando aparece | Efeito | Corrige com |
 |---|---|---|---|
 | `turnstile_off` | `TURNSTILE_SITE_KEY` ou `TURNSTILE_SECRET_KEY` vazia | `/register` aprova sem captcha | Criar o site no Cloudflare Turnstile e pôr as duas chaves no `.env` |
-| `tiss_simulated` | `TISS_TRANSPORT_DRIVER` diferente de `http` | Nenhum lote chega à operadora; em produção o envio é **bloqueado** (abaixo) | `TISS_TRANSPORT_DRIVER=http` e credenciais por operadora |
+| `tiss_simulated` | `TISS_TRANSPORT_DRIVER` diferente de `http` | Nenhum lote chega à operadora; em produção o envio é **bloqueado** (abaixo) | `TISS_TRANSPORT_DRIVER=http` e credenciais por operadora ([Credenciais TISS](credenciais-tiss.md)) |
 | `whatsapp_simulated` | `WHATSAPP_DRIVER` diferente de `gupshup` | Nenhuma mensagem sai | `WHATSAPP_DRIVER=gupshup` (ver [integração](../integracoes/whatsapp-gupshup.md)) |
 | `whatsapp_sandbox` | `GUPSHUP_SANDBOX=true` com driver `gupshup` | O teste de conexão usa o modelo do sandbox | `GUPSHUP_SANDBOX=false` |
 | `mail_not_sending` | `MAIL_MAILER` é `log` ou `array` | Nenhum e-mail sai, nem este alerta | Mailer real (SMTP) |
@@ -30,6 +30,8 @@ Com o transporte `mock`, o envio de lote gravava um protocolo "Aceito" que a ope
 
 - lote: a tela mostra "Envio bloqueado: o TISS está em modo simulação…"; o job da fila falha na hora (sem as 5 tentativas) e leva o lote a **erro** com esse motivo. Depois de configurar o transporte real, reenvie o lote;
 - guia cirúrgica avulsa: mesma mensagem (409).
+
+Com o driver `http`, o envio também é bloqueado quando a credencial do ambiente não tem endereço ou ainda é a provisória do faturamento ([Credenciais TISS](credenciais-tiss.md)). Fora de produção, o mock gera protocolo `SIMULADO-…`, e as telas avisam que nada foi enviado.
 
 Para demonstração, `TISS_ALLOW_SIMULATED_IN_PRODUCTION=true` libera o mock em produção. **Nada chega à operadora**; não use com clínica real faturando. Ambientes fora de produção (`APP_ENV` local ou testing) não são afetados. Um ambiente de teste que rode com `APP_ENV=production` precisa dessa liberação.
 

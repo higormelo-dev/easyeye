@@ -284,6 +284,7 @@ return [
         'financial'                => 'Financial',
         'cash_flow'                => 'Cash Flow',
         'tiss_billing'             => 'TISS Billing',
+        'tiss_credentials'         => 'TISS credentials',
         'financial_reports'        => 'Financial Reports',
         'cash_closing'             => 'Cash closing',
         'doctor_payouts'           => 'Doctor payouts',

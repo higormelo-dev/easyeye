@@ -51,5 +51,7 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- Hosts de teste (operadora.teste) não resolvem: a trava de SSRF do TISS é testada desligando isto. -->
+        <env name="TISS_ALLOW_PRIVATE_ENDPOINTS" value="true"/>
     </php>
 </phpunit>

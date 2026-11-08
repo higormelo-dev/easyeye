@@ -293,3 +293,27 @@ it('mock de verdade (padrão do projeto): cada guia responde no envelope do XSD 
     expect($types)->toContain('submitted')->toContain('authorized');
     expect($case->authorizationEvents->firstWhere('type', AuthorizationEventType::Authorized)->channel)->toBe('tiss');
 });
+
+it('transporte real com a credencial provisória (sem endereço e sem revisão): 409 com o que falta, nada reservado', function () {
+    config(['tiss.transport.driver' => 'http']);
+
+    try {
+        stcSend($this->guide);
+        $this->fail('esperava SurgeryRuleException');
+    } catch (SurgeryRuleException $e) {
+        expect($e->status)->toBe(409)
+            ->and($e->getMessage())->toContain(__('tiss_credentials.missing.endpoint'))
+            ->and($e->getMessage())->toContain(__('tiss_credentials.missing.review'));
+    }
+
+    expect($this->fake->calls)->toBe([])
+        ->and(TissTransmission::query()->count())->toBe(0)
+        ->and(TissIdempotencyKey::query()->count())->toBe(0);
+
+    // Revisada pelo administrador (com endereço): o envio segue.
+    TissEntityOperatorCredential::query()->forEntity((string) $this->guide->entity_id)->sole()
+        ->forceFill(['endpoint_submission' => 'https://operadora.test/tiss', 'metadata' => []])->save();
+
+    expect(stcSend($this->guide)->status)->toBe(TissTransmissionStatus::Acknowledged)
+        ->and($this->fake->calls)->toHaveCount(1);
+});

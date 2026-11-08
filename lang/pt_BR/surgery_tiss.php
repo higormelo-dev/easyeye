@@ -44,6 +44,7 @@ return [
         'refreshed'          => 'Guia atualizada a partir do pedido.',
         'xml_generated'      => 'XML gerado e validado contra o XSD do TISS 4.03.00.',
         'sent'               => 'Enviada à operadora (protocolo :protocol).',
+        'sent_simulated'     => 'Simulação: nada foi enviado à operadora. O protocolo :protocol é de teste e não vale como aceite.',
         'reopened'           => 'Guia reaberta para edição.',
         'cancelled'          => 'Guia cancelada.',
         'response_applied'   => 'Resposta da operadora registrada no log de autorização.',

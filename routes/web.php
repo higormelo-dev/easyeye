@@ -101,7 +101,7 @@ use App\Http\Controllers\Setting\{AdditionTypesController,
     VisitTypesController,
     VisualAcuityTypesController};
 use App\Http\Controllers\Setting\{AiDoctorPromptsController, CallPanelController, ScheduleSettingsController};
-use App\Http\Controllers\Setting\{CareGuidanceTemplatesController, ExamKitsController, ReportSettingsController, SecurityController};
+use App\Http\Controllers\Setting\{CareGuidanceTemplatesController, ExamKitsController, ReportSettingsController, SecurityController, TissCredentialsController};
 use App\Http\Controllers\Stock\{IolLensesController, ProcedureProductsController, ProductCategoriesController, ProductImportsController, ProductLotsController, ProductsController, PurchaseOrdersController, StockCountsController, StockMovementsController, StockReportsController, SuppliersController};
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
@@ -1181,6 +1181,30 @@ Route::group(
                 Route::patch('security/two-factor', [SecurityController::class, 'toggleTwoFactor'])
                     ->middleware('throttle:manager-destructive') // ação rara e de alto impacto
                     ->name('security.two-factor.toggle');
+
+                // ── Credenciais TISS por operadora e ambiente (Financeiro) ────
+                // Segredos cifrados e nunca devolvidos; certificado no disco
+                // privado; tudo auditado (TissCredentialManager).
+                Route::get('tiss-credentials', [TissCredentialsController::class, 'index'])->name('tiss-credentials.index');
+                // Limites com nome próprio: sem ele, todo throttle:N,1 divide um só contador por usuário.
+                Route::get('tiss-credentials/operators', [TissCredentialsController::class, 'operators'])
+                    ->middleware('throttle:60,1,tiss-credentials-search')
+                    ->name('tiss-credentials.operators');
+                Route::middleware('throttle:30,1,tiss-credentials-write')->group(function () {
+                    Route::post('tiss-credentials', [TissCredentialsController::class, 'store'])->name('tiss-credentials.store');
+                    // POST e não PUT: o formulário pode levar o arquivo do certificado.
+                    Route::post('tiss-credentials/{credential}', [TissCredentialsController::class, 'update'])
+                        ->whereUuid('credential')
+                        ->name('tiss-credentials.update');
+                    Route::delete('tiss-credentials/{credential}', [TissCredentialsController::class, 'destroy'])
+                        ->whereUuid('credential')
+                        ->name('tiss-credentials.destroy');
+                });
+                // O teste chama o webservice da operadora: limite menor.
+                Route::post('tiss-credentials/{credential}/test', [TissCredentialsController::class, 'test'])
+                    ->middleware('throttle:10,1,tiss-credentials-test')
+                    ->whereUuid('credential')
+                    ->name('tiss-credentials.test');
 
                 // WhatsApp (Gupshup): a configuração NÃO fica aqui — é exclusiva
                 // do dono do SaaS em /panel/manager/whatsapp (a conta de

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Tiss\Surgical;
 
 use App\Domains\Tiss\Enums\{TissGuideStatus, TissProtocolStatus, TissTransmissionStatus, TissXmlDirection, TissXmlStatus};
+use App\Domains\Tiss\Exceptions\TissCredentialIncompleteException;
 use App\Domains\Tiss\Models\{TissEntityOperatorCredential, TissGuide, TissIdempotencyKey, TissProtocol, TissTransmission, TissXmlDocument};
 use App\Domains\Tiss\Services\{LogTissStatusTransitionService, ValidateTissXmlService};
-use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, SimulatedTransportGuard, TissMessageTransportContract};
+use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, SimulatedTransportGuard, TissCredentialReadiness, TissMessageTransportContract};
 use App\Enums\Surgery\{AuthorizationEventType, SurgicalCaseStatus};
 use App\Exceptions\Surgery\SurgeryRuleException;
 use App\Models\Surgery\SurgicalCase;
@@ -97,7 +98,15 @@ class SendSurgicalGuideService
             // ANTES de reivindicar: sem credencial nada sai, e uma transmissão 'sending'
             // órfã seria lida depois como entrega em dúvida.
             $credential = $this->credential($guide);
-            $key        = $this->idempotencyKey($guide, $document);
+
+            // Transporte real com credencial incompleta: regra de negócio (409), nada reservado ainda.
+            try {
+                TissCredentialReadiness::assertReady($credential);
+            } catch (TissCredentialIncompleteException $e) {
+                throw new SurgeryRuleException($e->getMessage(), 409);
+            }
+
+            $key = $this->idempotencyKey($guide, $document);
 
             $this->reserveKey($guide, $key, $document);
 
@@ -654,7 +663,8 @@ class SendSurgicalGuideService
         $statusCode = $result['status_code'] ?? null;
         $errorCode  = (string) ($result['error_code'] ?? '');
 
-        if ($errorCode === 'missing_endpoint') {
+        // Nunca saiu da clínica: sem endereço, ou recusado antes de conectar (destino ou certificado).
+        if (in_array($errorCode, ['missing_endpoint', HttpTissTransportClient::NOT_SENT], true)) {
             return false;
         }
 

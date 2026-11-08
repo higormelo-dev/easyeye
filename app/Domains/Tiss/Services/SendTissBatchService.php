@@ -7,7 +7,7 @@ namespace App\Domains\Tiss\Services;
 use App\Domains\Tiss\Enums\{TissBatchStatus, TissGuideStatus, TissProtocolStatus, TissTransmissionStatus, TissXmlDirection, TissXmlStatus};
 use App\Domains\Tiss\Exceptions\TissBatchCancelledException;
 use App\Domains\Tiss\Models\{TissBatch, TissEntityOperatorCredential, TissIdempotencyKey, TissProtocol, TissTransmission, TissXmlDocument};
-use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, SimulatedTransportGuard, TissTransportContract};
+use App\Domains\Tiss\Services\Transport\{HttpTissTransportClient, SimulatedTransportGuard, TissCredentialReadiness, TissTransportContract};
 use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\{Carbon, Str};
@@ -96,6 +96,9 @@ class SendTissBatchService
             if (! $credential) {
                 throw new RuntimeException('Credencial ativa da operadora não encontrada para envio TISS.');
             }
+
+            // Transporte real com credencial incompleta: não sai, e nada foi reservado nem reivindicado ainda.
+            TissCredentialReadiness::assertReady($credential);
 
             $idempotencyKey = $this->buildIdempotencyKey($batch, $xmlDocument);
             $idempotency    = $this->reserveIdempotency($batch, $idempotencyKey, $xmlDocument, $force);
@@ -1218,7 +1221,8 @@ class SendTissBatchService
         $statusCode = $result['status_code'] ?? null;
         $errorCode  = (string) ($result['error_code'] ?? '');
 
-        if ($errorCode === 'missing_endpoint') {
+        // Nunca saiu da clínica: sem endereço, ou recusado antes de conectar (destino ou certificado).
+        if (in_array($errorCode, ['missing_endpoint', HttpTissTransportClient::NOT_SENT], true)) {
             return false;
         }
 

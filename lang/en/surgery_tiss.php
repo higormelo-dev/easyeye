@@ -44,6 +44,7 @@ return [
         'refreshed'          => 'Form refreshed from the request.',
         'xml_generated'      => 'XML generated and validated against the TISS 4.03.00 XSD.',
         'sent'               => 'Sent to the insurer (protocol :protocol).',
+        'sent_simulated'     => 'Simulation: nothing was sent to the insurer. Protocol :protocol is a test one and is not an acceptance.',
         'reopened'           => 'Form reopened for editing.',
         'cancelled'          => 'Form cancelled.',
         'response_applied'   => 'Insurer response recorded in the authorization log.',

@@ -21,6 +21,8 @@ return [
 
     'simulated_blocked' => 'Envio bloqueado: o TISS está em modo simulação neste ambiente (TISS_TRANSPORT_DRIVER diferente de http), então o lote não chegaria à operadora. Peça ao suporte para configurar o transporte real; depois reenvie o lote.',
 
+    'credential_incomplete' => 'Envio bloqueado: a credencial TISS de :operator (:environment) está incompleta. Falta: :missing. Um administrador da clínica completa em Financeiro > Credenciais TISS; depois reenvie.',
+
     'forced_resend_failed' => 'O reenvio falhou (:reason). A confirmação da operadora foi preservada: o lote continua enviado e nada nele foi alterado.',
 
     'delivery_still_unknown' => 'Esta tentativa falhou (:reason), mas o envio anterior ficou sem resposta e continua em dúvida: não sabemos se a operadora recebeu o lote, e esta falha não prova que ela não recebeu. O lote segue bloqueado para alterações até a operadora confirmar o recebimento: corrija a causa (por exemplo, a credencial ou o endereço do serviço) e envie de novo — o mesmo XML e a mesma chave de envio são reutilizados, o que evita a operadora receber o lote duas vezes.',

@@ -41,6 +41,21 @@ return [
             'report' => false,
         ],
 
+        // Certificados digitais das credenciais TISS (Configurações > Credenciais TISS). Disco local PRIVADO:
+        // nunca servido por URL (serve=false) e arquivos em 0600 — o cURL do envio lê o caminho no disco.
+        'tiss-certificates' => [
+            'driver'      => 'local',
+            'root'        => storage_path('app/private/tiss-certificates'),
+            'serve'       => false,
+            'visibility'  => 'private',
+            'permissions' => [
+                'file' => ['public' => 0600, 'private' => 0600],
+                'dir'  => ['public' => 0700, 'private' => 0700],
+            ],
+            'throw'  => false,
+            'report' => false,
+        ],
+
         'public' => [
             'driver'     => 'local',
             'root'       => storage_path('app/public'),

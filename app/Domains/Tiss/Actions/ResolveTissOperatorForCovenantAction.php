@@ -17,8 +17,8 @@ use Illuminate\Validation\ValidationException;
  * A credencial gerada aqui não carrega segredo real (sem username/senha/certificado) —
  * ela só existe para satisfazer SendTissBatchService::resolveCredential(), que exige uma
  * linha ativa mesmo quando o transporte configurado é o mock (config('tiss.transport.driver')).
- * Para envio real a uma operadora, a clínica precisa substituir essa credencial pelas
- * credenciais reais do webservice contratado.
+ * Para envio real a uma operadora, o administrador da clínica completa essa credencial em
+ * Financeiro > Credenciais TISS; até lá o transporte http recusa o envio (TissCredentialReadiness).
  */
 class ResolveTissOperatorForCovenantAction
 {
@@ -42,7 +42,7 @@ class ResolveTissOperatorForCovenantAction
     public function __invoke(Covenant $covenant, string $entityId): TissEntityOperatorContract
     {
         return DB::transaction(function () use ($covenant, $entityId): TissEntityOperatorContract {
-            $operator = $this->resolveOperator($covenant);
+            $operator = $this->operatorFor($covenant);
 
             $this->resolveCredential($entityId, $operator->id);
 
@@ -79,7 +79,11 @@ class ResolveTissOperatorForCovenantAction
         );
     }
 
-    private function resolveOperator(Covenant $covenant): TissOperator
+    /**
+     * Operadora TISS do convênio (pelo registro ANS), criada na primeira vez. Também usada pela tela de
+     * credenciais, que não deve criar contrato nem credencial provisória.
+     */
+    public function operatorFor(Covenant $covenant): TissOperator
     {
         if ($covenant->tiss_operator_id) {
             $existing = $covenant->tissOperator()->first();

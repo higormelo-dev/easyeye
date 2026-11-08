@@ -107,6 +107,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trimStrings(except: [
             'eye_images_pedal_shortcuts.capture_key',
             'eye_images_pedal_shortcuts.advance_key',
+            // Senha do certificado TISS: espaço nas pontas pode fazer parte dela.
+            'certificate_password',
         ]);
 
         $middleware->alias([
@@ -160,9 +162,10 @@ return Application::configure(basePath: dirname(__DIR__))
             Integration::handles($exceptions);
         }
 
-        // Token/cartão criptografado do checkout e as credenciais da Focus NFe (Manager → Nota fiscal) nunca voltam para a sessão
-        // (a sessão não é cifrada em todos os drivers e a validação falha com redirect + input flashed).
-        $exceptions->dontFlash(['card_token', 'token', 'master_token', 'webhook_secret']);
+        // Token/cartão criptografado do checkout, as credenciais da Focus NFe (Manager → Nota fiscal) e a senha do
+        // certificado TISS (Financeiro → Credenciais TISS) nunca voltam para a sessão (a sessão não é cifrada em todos
+        // os drivers e a validação falha com redirect + input flashed).
+        $exceptions->dontFlash(['card_token', 'token', 'master_token', 'webhook_secret', 'certificate_password']);
 
         // Link do Revisor Clínico adulterado ou com a assinatura vencida: a MESMA página
         // genérica de qualquer outro problema do link (id, token, prazo, revogação) — a

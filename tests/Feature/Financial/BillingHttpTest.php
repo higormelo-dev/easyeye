@@ -155,7 +155,8 @@ it('submits a batch to the tiss workflow via http and flashes success', function
     $response = $this->post(route('panel.financial.billing.batches.submit', $batch->id));
 
     $response->assertRedirect();
-    $response->assertSessionHas('success');
+    // Transporte padrão dos testes é o mock: o aviso diz que foi simulação, não um envio à operadora.
+    $response->assertSessionHas('success', __('financial_billing.flash.batch_simulated', ['code' => $batch->code]));
     expect($batch->fresh()->status->value)->toBe('submitted');
 });
 
